@@ -46,7 +46,8 @@
   let 선택된브랜드품목 = $derived(선택된브랜드?품목목록&&품목목록[선택된브랜드]:undefined);
 
   let 변경된행 = new SvelteSet<개별품목타입>();
-  $inspect(변경된행);
+
+  let 마진공급가자동계산 = $state(false);
 
   interface 아이디목록타입 {
     "mb_no": string,
@@ -88,7 +89,8 @@
   
   let 품목테이블컬럼속성:품목테이블컬럼속성타입 = $derived({
     no_id: {width: '0%', display: false, label: ''},
-    품목명: {width: '40%', display: true, label: '품목명'},
+    품목명: {width: '30%', display: true, label: '품목명'},
+    소비자가: {width: '10%', display: true, label: '소비자가'},
     기본마진: {width: '10%', display: true, label: '기본 마진'},
     기본공급가: {width: '10%', display: true, label: '기본 공급가'},
     할인수량: {width: '10%', display: true, label: '할인 수량'},
@@ -328,6 +330,7 @@
   <div class="app-toolbar">
     <div class="app-user-select-container"><select multiple class="app-user-select" bind:this={아이디입력상자}></select></div>
     <div class="app-submit-div">
+      <label class="app-checkbox-label"><input type="checkbox" bind:checked={마진공급가자동계산}>마진↔︎공급가 자동계산</label>
       <button type="button" class={["cancel", 내용변경여부||'disabled']} onclick={()=>{변경된행.clear(); 품목목록 = structuredClone($state.snapshot(품목목록사본)); 브랜드일괄편집필드리셋()}}><i class="fas fa-redo"></i> 변경 취소</button>
       <button type="button" class={["submit", 내용변경여부||'disabled']} onclick={()=>console.log(JSON.stringify(Array.from(변경된행)))}><i class="fas fa-check"></i> 저장</button>
     </div>
@@ -354,6 +357,7 @@
       <tbody>
         <tr>
           <td><div><span><b>{선택된브랜드} 브랜드 전체 수정</b></span></div></td>
+          <td></td>
           <td><div><input type="text" onchange={(e)=>브랜드값일괄편집(e.currentTarget.value, 'default_margin')} bind:value={()=>로케일숫자로표시(브랜드일괄편집필드.default_margin),(v)=>{브랜드일괄편집필드.default_margin = 숫자로변환(v)}}></div></td>
           <td><div><input type="text" onchange={(e)=>브랜드값일괄편집(e.currentTarget.value, 'default_prov')} bind:value={()=>로케일숫자로표시(브랜드일괄편집필드.default_prov),(v)=>{브랜드일괄편집필드.default_prov = 숫자로변환(v)}}></div></td>
           <td><div><input type="text" onchange={(e)=>브랜드값일괄편집(e.currentTarget.value, 'discount_qty')} bind:value={()=>로케일숫자로표시(브랜드일괄편집필드.discount_qty),(v)=>{브랜드일괄편집필드.discount_qty = 숫자로변환(v)}}></div></td>
@@ -364,6 +368,7 @@
         {#each 선택된브랜드품목 as 품목}
         <tr>
           <td><div><span>{품목.product}</span></div></td>
+          <td><div style="text-align: center;"><span>{Intl.NumberFormat('ko-KR').format(품목.price)}</span></div></td>
           {#if typeof 품목.default_margin == 'object'}
           <td><div><input type="text" onchange={()=>행업데이트(품목)} bind:value={()=>로케일숫자로표시((품목.default_margin as 마진타입).default_margin),(v)=>{(품목.default_margin as 마진타입).default_margin = 숫자로변환(v)}}></div></td>
           <td><div><input type="text" onchange={()=>행업데이트(품목)} bind:value={()=>로케일숫자로표시((품목.default_margin as 마진타입).default_prov),(v)=>{(품목.default_margin as 마진타입).default_prov = 숫자로변환(v)}}></div></td>
@@ -389,6 +394,56 @@
   }
   .app-user-select-container {
     flex-grow: 1;
+  }
+  .app-submit-div {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+  }
+  .app-checkbox-label {
+    display: flex;
+    align-items: center;
+    position: relative;
+  }
+  .app-checkbox-label input[type="checkbox"] {
+    width: 0; height: 0; overflow: hidden;
+  }
+  .app-checkbox-label:has(input[type="checkbox"])::before {
+    content: "";
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    border-radius: 4px;
+    border: 2px solid #ddd;
+  }
+  .app-checkbox-label:has(input[type="checkbox"]:checked)::after {
+    content: "";
+    position: absolute;
+    display: inline-block;
+    width: calc(1em - 2px);
+    height: calc(1em - 2px);
+    left: 3px;
+    top: 3px;
+    border-radius: 3px;
+    background: rgb(10,127,251);
+  }
+  .app-checkbox-label:has(input[type="checkbox"]):hover::before {
+    border: 2px solid #bbb;
+  }
+  .app-checkbox-label:has(input[type="checkbox"]:focus)::before {
+    border: 2px solid rgb(10,127,251)!important;
+  }
+  .app-checkbox-label:has(input[type="checkbox"]:active)::before {
+    background: #eee;
+  }
+  .app-checkbox-label:has(input[type="checkbox"]:checked)::before {
+    border: 2px solid rgb(10,127,251);
+  }
+  .app-checkbox-label:has(input[type="checkbox"]:checked):hover::after {
+    background: rgb(95, 164, 237);
+  }
+  .app-checkbox-label:has(input[type="checkbox"]:active:checked)::after {
+    background: rgb(16, 99, 189);
   }
   .app-submit-div button {
     border: none;
@@ -450,6 +505,7 @@
     outline: none;
     border-bottom: 2px solid #eee;
     transition: border 0.2s, background-color 0.2s;
+    text-align: center;
   }
   .app-table td input[type="text"]:hover {
     border-color: #ccc;
