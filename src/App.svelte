@@ -90,13 +90,13 @@
   let 품목테이블컬럼속성:품목테이블컬럼속성타입 = $derived({
     no_id: {width: '0%', display: false, label: ''},
     품목명: {width: '30%', display: true, label: '품목명'},
-    소비자가: {width: '10%', display: true, label: '소비자가'},
-    기본마진: {width: '10%', display: true, label: '기본 마진'},
-    기본공급가: {width: '10%', display: true, label: '기본 공급가'},
-    할인수량: {width: '10%', display: true, label: '할인 수량'},
-    할인마진: {width: '10%', display: true, label: (선택된아이디.length == 0?'기본 ':'업체별 ') + '할인 마진'},
-    할인공급가: {width: '10%', display: true, label: (선택된아이디.length == 0?'기본 ':'업체별 ') + '할인 공급가'},
-    브랜드할인최소액: {width: '10%', display: true, label: '브랜드 할인 최소액'}
+    소비자가: {width: '10%', display: true, label: '소비자가(원)'},
+    기본마진: {width: '10%', display: true, label: '기본 마진(%)'},
+    기본공급가: {width: '10%', display: true, label: '기본 공급가(원)'},
+    할인수량: {width: '10%', display: true, label: '할인 수량(개)'},
+    할인마진: {width: '10%', display: true, label: (선택된아이디.length == 0?'기본 ':'업체별 ') + '할인 마진(%)'},
+    할인공급가: {width: '10%', display: true, label: (선택된아이디.length == 0?'기본 ':'업체별 ') + '할인 공급가(원)'},
+    브랜드할인최소액: {width: '10%', display: true, label: '브랜드 할인 최소액(원)'}
   });
 
   let 브랜드일괄편집필드:Omit<마진타입, 'per_user'> = $state({
@@ -391,6 +391,7 @@
   .app-toolbar {
     display: flex;
     gap: 1em;
+    margin-top: 1em;
   }
   .app-user-select-container {
     flex-grow: 1;
@@ -475,14 +476,20 @@
   }
   .app-table-container {
     margin-top: 1em;
+    overflow-x: auto;
+    height: calc(100vh - calc(160px + 5em));
+    overflow-y: auto;
   }
   .app-table {
     width: 100%;
+    min-width: 960px;
     table-layout: fixed;
     border-collapse: collapse;
   }
   .app-table thead {
     background: #eee;
+    position: sticky;
+    top: 0;
   }
   .app-table tr {
     border-bottom: 1px solid #ddd;
@@ -491,10 +498,12 @@
     height: 1em;
   }
   .app-table :is(th,td) div {
-    padding: 1em;
+    padding: 0.5em;
   }
   .app-table :is(th,td) span {
     padding: 0.5em;
+    word-break: keep-all;
+    overflow-wrap: break-word;
   }
   .app-table td input[type="text"] {
     width: 100%;
