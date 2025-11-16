@@ -4,6 +4,7 @@
   import Swal from 'sweetalert2';
   import Sidebar from "./sidebar.svelte";
   import { onMount } from "svelte";
+  import { SvelteSet } from "svelte/reactivity";
 
   interface 개별품목타입 {
     no_id: number,
@@ -37,11 +38,15 @@
   }
 
   let 품목목록:품목목록타입 = $state({});
-
+  let 품목목록사본:품목목록타입 = $state({});
+  
   let 브랜드:string[]|undefined = $state();
-
+  
   let 선택된브랜드:string|undefined = $state();
   let 선택된브랜드품목 = $derived(선택된브랜드?품목목록&&품목목록[선택된브랜드]:undefined);
+
+  let 변경된행 = new SvelteSet<개별품목타입>();
+  $inspect(변경된행);
 
   interface 아이디목록타입 {
     "mb_no": string,
@@ -61,8 +66,8 @@
         searchField: ['mb_id','mb_nick'],
         plugins: {
           remove_button:{
-			      title:'항목 삭제',
-		      }
+            title:'항목 삭제',
+          }
         },
         placeholder: "아이디 선택...",
         onChange: (value: string[])=>선택된아이디=value,
@@ -101,6 +106,19 @@
     brand_disc_amount: undefined
   });
 
+  let 내용변경여부 = $state(false);
+
+  function 브랜드일괄편집필드리셋 () {
+    브랜드일괄편집필드 = {
+      default_margin: undefined,
+      default_prov: undefined,
+      discount_qty: undefined,
+      discount_margin: undefined,
+      discount_price: undefined,
+      brand_disc_amount: undefined
+    }
+  }
+
   async function 품목목록가져오기 () {
       try {
           const 가져오기 = await fetch('https://b2b.soundcat.com/page/get_products.php',{
@@ -128,7 +146,6 @@
                       throw new Error('마진 란이 비어있습니다.');
                     }
                   } catch (e) {
-                    // console.error(e);
                     default_margin = {
                       default_margin: 0,
                       default_prov: 0,
@@ -143,8 +160,9 @@
                     ...아이템,
                     default_margin
                   }
-                })
+                });
               });
+              품목목록사본 = structuredClone($state.snapshot(품목목록));
           } else {
               throw new Error("서버 접속 실패." + JSON.stringify(가져오기));
           }
@@ -233,6 +251,7 @@
           품목.default_margin.per_user[element].discount_margin = 숫자로변환(v??품목.default_margin.default_margin);
         });
       }
+      변경된행.add(품목);
     });
   }
 
@@ -255,6 +274,7 @@
           품목.default_margin.per_user[element].discount_price = 숫자로변환(v??품목.default_margin.default_prov);
         });
       }
+      변경된행.add(품목);
     });
   }
 
@@ -273,7 +293,12 @@
   function 브랜드값일괄편집<Target extends Exclude<keyof 마진타입, 'per_user'>>(값: string|number, 타겟: Target) {
     선택된브랜드품목?.forEach((품목)=>{
       (품목.default_margin as 마진타입)[타겟] = 숫자로변환(값);
+      변경된행.add(품목)
     })
+  }
+
+  function 행업데이트 (품목:개별품목타입) {
+    변경된행.add(품목);
   }
 
   onMount(async ()=>{
@@ -288,33 +313,23 @@
   });
 
   $effect(()=>{
-    if (선택된브랜드) 브랜드일괄편집필드 = {
-      default_margin: undefined,
-      default_prov: undefined,
-      discount_qty: undefined,
-      discount_margin: undefined,
-      discount_price: undefined,
-      brand_disc_amount: undefined
-    }
+    if (선택된브랜드) 브랜드일괄편집필드리셋()
   });
   $effect(()=>{
-    if (선택된아이디) 브랜드일괄편집필드 = {
-      default_margin: undefined,
-      default_prov: undefined,
-      discount_qty: undefined,
-      discount_margin: undefined,
-      discount_price: undefined,
-      brand_disc_amount: undefined
-    }
+    if (선택된아이디) 브랜드일괄편집필드리셋()
   });
+
+  $effect(()=>{
+    내용변경여부 = 변경된행.size > 0 ? true : false;
+  })
 </script>
 <section class="app-section">
   <Sidebar 브랜드={브랜드} bind:선택된브랜드={선택된브랜드} />
   <div class="app-toolbar">
     <div class="app-user-select-container"><select multiple class="app-user-select" bind:this={아이디입력상자}></select></div>
     <div class="app-submit-div">
-      <button type="button" class="cancel"><i class="fas fa-redo"></i> 변경 취소</button>
-      <button type="button" class="submit"><i class="fas fa-check"></i> 저장</button>
+      <button type="button" class={["cancel", 내용변경여부||'disabled']} onclick={()=>{변경된행.clear(); 품목목록 = structuredClone($state.snapshot(품목목록사본)); 브랜드일괄편집필드리셋()}}><i class="fas fa-redo"></i> 변경 취소</button>
+      <button type="button" class={["submit", 내용변경여부||'disabled']} onclick={()=>console.log(JSON.stringify(Array.from(변경된행)))}><i class="fas fa-check"></i> 저장</button>
     </div>
   </div>
   {#if 선택된브랜드 && 선택된브랜드품목}
@@ -350,12 +365,12 @@
         <tr>
           <td><div><span>{품목.product}</span></div></td>
           {#if typeof 품목.default_margin == 'object'}
-          <td><div><input type="text" bind:value={()=>로케일숫자로표시((품목.default_margin as 마진타입).default_margin),(v)=>{(품목.default_margin as 마진타입).default_margin = 숫자로변환(v)}}></div></td>
-          <td><div><input type="text" bind:value={()=>로케일숫자로표시((품목.default_margin as 마진타입).default_prov),(v)=>{(품목.default_margin as 마진타입).default_prov = 숫자로변환(v)}}></div></td>
-          <td><div><input type="text" bind:value={()=>로케일숫자로표시((품목.default_margin as 마진타입).discount_qty),(v)=>{(품목.default_margin as 마진타입).discount_qty = 숫자로변환(v)}}></div></td>
-          <td><div><input type="text" bind:value={()=>할인마진겟터(품목),(v)=>{할인마진셋터(v,품목)}}></div></td>
-          <td><div><input type="text" bind:value={()=>할인공급가겟터(품목),(v)=>{할인공급가셋터(v,품목)}}></div></td>
-          <td><div><input type="text" bind:value={()=>로케일숫자로표시((품목.default_margin as 마진타입).brand_disc_amount),(v)=>{(품목.default_margin as 마진타입).brand_disc_amount = 숫자로변환(v)}}></div></td>
+          <td><div><input type="text" onchange={()=>행업데이트(품목)} bind:value={()=>로케일숫자로표시((품목.default_margin as 마진타입).default_margin),(v)=>{(품목.default_margin as 마진타입).default_margin = 숫자로변환(v)}}></div></td>
+          <td><div><input type="text" onchange={()=>행업데이트(품목)} bind:value={()=>로케일숫자로표시((품목.default_margin as 마진타입).default_prov),(v)=>{(품목.default_margin as 마진타입).default_prov = 숫자로변환(v)}}></div></td>
+          <td><div><input type="text" onchange={()=>행업데이트(품목)} bind:value={()=>로케일숫자로표시((품목.default_margin as 마진타입).discount_qty),(v)=>{(품목.default_margin as 마진타입).discount_qty = 숫자로변환(v)}}></div></td>
+          <td><div><input type="text" onchange={()=>행업데이트(품목)} bind:value={()=>할인마진겟터(품목),(v)=>{할인마진셋터(v,품목)}}></div></td>
+          <td><div><input type="text" onchange={()=>행업데이트(품목)} bind:value={()=>할인공급가겟터(품목),(v)=>{할인공급가셋터(v,품목)}}></div></td>
+          <td><div><input type="text" onchange={()=>행업데이트(품목)} bind:value={()=>로케일숫자로표시((품목.default_margin as 마진타입).brand_disc_amount),(v)=>{(품목.default_margin as 마진타입).brand_disc_amount = 숫자로변환(v)}}></div></td>
           {/if}
         </tr>
         {/each}
