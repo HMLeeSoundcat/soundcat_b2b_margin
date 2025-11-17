@@ -95,7 +95,10 @@
   li button:focus {
     border-color: rgb(10, 127, 251);
   }
-  li button:active,
+  li button:active {
+    background: rgb(9, 111, 220)!important;
+    color: white;
+  }
   li button.active {
     background: rgb(10, 127, 251);
     color: white;

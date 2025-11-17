@@ -718,6 +718,7 @@
   }
   .app-table thead {
     background: #eee;
+    box-shadow: 0 2px 4px #0002;
     position: sticky;
     top: 0;
   }
