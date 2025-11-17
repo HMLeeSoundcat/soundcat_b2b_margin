@@ -5,6 +5,7 @@
   import Sidebar from "./sidebar.svelte";
   import {onMount} from "svelte";
   import {SvelteSet} from "svelte/reactivity";
+  import Portal from "svelte-portal";
 
   interface 개별품목타입 {
     no_id: number;
@@ -15,7 +16,7 @@
     stock: number;
     soldout: number;
     price: number;
-    default_margin: string | 마진타입;
+    default_margin: null | string | 마진타입;
   }
 
   interface 품목목록타입 {
@@ -37,6 +38,21 @@
     };
   }
 
+  interface 아이디목록타입 {
+    mb_no: string;
+    mb_id: string;
+    mb_nick: string;
+    mb_8: string;
+  }
+  
+  interface 품목테이블컬럼속성타입 {
+    [key: string]: {
+      width: string;
+      display: boolean;
+      label: string;
+    };
+  }
+
   let 품목목록: 품목목록타입 = $state({});
   let 품목목록사본: 품목목록타입 = $state({});
 
@@ -48,13 +64,6 @@
   let 변경된행 = new SvelteSet<개별품목타입>();
 
   let 마진공급가자동계산 = $state(false);
-
-  interface 아이디목록타입 {
-    mb_no: string;
-    mb_id: string;
-    mb_nick: string;
-    mb_8: string;
-  }
 
   let 아이디목록: 아이디목록타입[] | undefined = $state([]);
 
@@ -77,14 +86,6 @@
   });
 
   let 선택된아이디: string[] = $state([]);
-
-  interface 품목테이블컬럼속성타입 {
-    [key: string]: {
-      width: string;
-      display: boolean;
-      label: string;
-    };
-  }
 
   let 품목테이블컬럼속성: 품목테이블컬럼속성타입 = $derived({
     no_id: {width: "0%", display: false, label: ""},
@@ -121,6 +122,25 @@
 
   let 내용변경여부 = $state(false);
 
+  let 적용중여부 = $state(false);
+
+  let 적용반환값:{
+    method: string,
+    status: string,
+    error: string|null,
+    data: string[],
+  }|undefined|null = $state();
+
+  const 설정초기화값 =  {
+    default_margin: 0,
+    default_prov: 0,
+    discount_qty: 0,
+    discount_margin: 0,
+    discount_price: 0,
+    brand_disc_amount: 0,
+    per_user: {},
+  }
+
   function 브랜드일괄편집필드리셋() {
     브랜드일괄편집필드 = {
       default_margin: undefined,
@@ -154,21 +174,13 @@
             try {
               if (typeof 아이템.default_margin == "string") {
                 default_margin = JSON.parse(아이템.default_margin);
-
                 if (typeof default_margin != "object") throw new Error("마진 란이 객채가 아닙니다.");
+                if (Object.keys(default_margin).length == 0) throw new Error("마진 란이 비어있습니다.");
               } else {
                 throw new Error("마진 란이 비어있습니다.");
               }
             } catch (e) {
-              default_margin = {
-                default_margin: 0,
-                default_prov: 0,
-                discount_qty: 0,
-                discount_margin: 0,
-                discount_price: 0,
-                brand_disc_amount: 0,
-                per_user: {},
-              };
+              default_margin = structuredClone(설정초기화값);
             }
             return {
               ...아이템,
@@ -214,6 +226,7 @@
 
   function 유저별엔트리생성(품목: 개별품목타입, 아이디: string) {
     if (typeof 품목.default_margin != "object") return;
+    if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
 
     if (!품목.default_margin.per_user?.[아이디])
       품목.default_margin.per_user[아이디] = {
@@ -224,6 +237,7 @@
 
   function 할인마진겟터(품목: 개별품목타입, 숫자로반환: boolean | undefined = false) {
     if (typeof 품목.default_margin != "object") return;
+    if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
     if (선택된아이디.length == 0) {
       return 숫자로반환 ? 품목.default_margin.discount_margin : 로케일숫자로표시(품목.default_margin.discount_margin);
     } else if (선택된아이디.length == 1) {
@@ -239,6 +253,7 @@
 
   function 할인공급가겟터(품목: 개별품목타입, 숫자로반환: boolean | undefined = false) {
     if (typeof 품목.default_margin != "object") return;
+    if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
     if (선택된아이디.length == 0) {
       return 숫자로반환 ? 품목.default_margin.discount_price : 로케일숫자로표시(품목.default_margin.discount_price);
     } else if (선택된아이디.length == 1) {
@@ -257,6 +272,7 @@
 
     세팅할품목.forEach((품목) => {
       if (typeof 품목.default_margin != "object") return;
+      if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
       if (선택된아이디.length == 0) {
         품목.default_margin.discount_margin = 숫자로변환(v ?? 품목.default_margin.default_margin);
         if (마진공급가자동계산) 품목.default_margin.discount_price = parseFloat(String(품목.price)) * ((100 - parseFloat(String(숫자로변환(v ?? 품목.default_margin.default_margin)))) / 100);
@@ -267,6 +283,7 @@
       } else {
         선택된아이디.forEach((element) => {
           if (typeof 품목.default_margin != "object") return;
+          if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
           유저별엔트리생성(품목, element);
           품목.default_margin.per_user[element].discount_margin = 숫자로변환(v ?? 품목.default_margin.default_margin);
           if (마진공급가자동계산) 품목.default_margin.per_user[element].discount_price = parseFloat(String(품목.price)) * ((100 - parseFloat(String(품목.default_margin.per_user[element].discount_margin))) / 100);
@@ -281,6 +298,7 @@
 
     세팅할품목.forEach((품목) => {
       if (typeof 품목.default_margin != "object") return;
+      if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
       if (선택된아이디.length == 0) {
         품목.default_margin.discount_price = 숫자로변환(v ?? 품목.default_margin.default_margin);
         품목.default_margin.discount_margin = 100 - (parseFloat(String(품목.default_margin.discount_price)) / parseFloat(String(품목.price))) * 100;
@@ -291,6 +309,7 @@
       } else {
         선택된아이디.forEach((element) => {
           if (typeof 품목.default_margin != "object") return;
+          if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
           유저별엔트리생성(품목, element);
           품목.default_margin.per_user[element].discount_price = 숫자로변환(v ?? 품목.default_margin.default_prov);
           품목.default_margin.per_user[element].discount_margin = 100 - (parseFloat(String(품목.default_margin.per_user[element].discount_price)) / parseFloat(String(품목.price))) * 100;
@@ -320,6 +339,7 @@
       (품목.default_margin as 마진타입)[타겟] = 숫자로변환(값);
       if (마진공급가자동계산) {
         if (typeof 품목.default_margin != "object") return;
+        if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
         switch (타겟) {
           case "default_margin":
             품목.default_margin.default_prov = parseFloat(String(품목.price)) * ((100 - parseFloat(String(품목.default_margin.default_margin))) / 100);
@@ -336,6 +356,7 @@
   function 행업데이트(품목: 개별품목타입, 타겟: "default_margin" | "default_prov" | undefined = undefined) {
     if (마진공급가자동계산 && 타겟) {
       if (typeof 품목.default_margin != "object") return;
+      if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
       switch (타겟) {
         case "default_margin":
           품목.default_margin.default_prov = parseFloat(String(품목.price)) * ((100 - parseFloat(String(품목.default_margin.default_margin))) / 100);
@@ -346,6 +367,48 @@
       }
     }
     변경된행.add(품목);
+  }
+
+  async function 적용 () {
+    적용중여부 = true;
+    try {
+      const 요청 = await fetch("https://b2b.soundcat.com/page/margin_setup_update.php",{
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Use-Dev": "true"
+        },
+        body: JSON.stringify(Array.from(변경된행))
+      });
+
+      if (요청.ok) {
+        const 결과:typeof 적용반환값 = await 요청.json();
+        await Swal.fire({
+          icon: 'success',
+          title: '작업이 성공적으로 이루어졌습니다.',
+          html: '&nbsp;',
+          confirmButtonText: '닫기',
+          customClass: {
+            htmlContainer: "successful-popup",
+          },
+          willOpen: ()=>{
+            적용반환값 = 결과;
+            적용중여부 = false;
+          },
+        });
+
+        적용반환값 = undefined;
+        변경된행.clear();
+        품목목록사본 = structuredClone($state.snapshot(품목목록));
+      } else {
+        throw new Error('서버에 접속하지 못했습니다: '+ JSON.stringify(요청));
+      }
+
+    } catch (e) {
+      console.error(e);
+    } finally {
+      적용중여부 = false
+    }
   }
 
   onMount(async () => {
@@ -371,7 +434,7 @@
   });
 </script>
 
-<section class="app-section">
+<section class={["app-section",적용중여부&&"submitting"]}>
   <Sidebar {브랜드} bind:선택된브랜드 품목목록가져오기={품목목록가져오기} />
   <div class="app-toolbar">
     <div class="app-user-select-container">
@@ -387,7 +450,7 @@
           품목목록 = structuredClone($state.snapshot(품목목록사본));
           브랜드일괄편집필드리셋();
         }}><i class="fas fa-redo"></i> 변경 취소</button>
-      <button type="button" class={["submit", 내용변경여부 || "disabled"]} onclick={() => console.log(JSON.stringify(Array.from(변경된행)))}>
+      <button type="button" class={["submit", 내용변경여부 || "disabled"]} onclick={적용}>
         <i class="fas fa-check"></i> 저장
       </button>
     </div>
@@ -455,21 +518,7 @@
                     }
                   } />
               </div></td>
-            <td>
-              {#if false}
-                <div>
-                  <input
-                    type="text"
-                    onchange={(e) => 브랜드값일괄편집(e.currentTarget.value, "default_prov")}
-                    bind:value={
-                      () => 로케일숫자로표시(브랜드일괄편집필드.default_prov),
-                      (v) => {
-                        브랜드일괄편집필드.default_prov = 숫자로변환(v);
-                      }
-                    } />
-                </div>
-              {/if}
-            </td>
+            <td></td>
             <td>
               <div>
                 <input
@@ -482,21 +531,7 @@
                     }
                   } />
               </div></td>
-            <td>
-              {#if false}
-                <div>
-                  <input
-                    type="text"
-                    onchange={(e) => 할인공급가셋터(e.currentTarget.value, 선택된브랜드품목 as 개별품목타입[])}
-                    bind:value={
-                      () => 로케일숫자로표시(브랜드일괄편집필드.discount_price),
-                      (v) => {
-                        브랜드일괄편집필드.discount_price = 숫자로변환(v);
-                      }
-                    } />
-                </div>
-              {/if}
-            </td>
+            <td></td>
             <td>
               <div>
                 <input
@@ -610,10 +645,48 @@
     </div>
   {/if}
 </section>
-
+{#if 적용반환값}
+<Portal target=".successful-popup">
+<div>
+<div>아래 품목에 적용되었습니다.</div>
+<details>
+  <summary>적용된 품목 보기</summary>
+  <div>
+    <code>
+      <pre>{적용반환값.data?.join("\n")}</pre>
+    </code>
+  </div>
+</details>
+</div>
+</Portal>
+{/if}
 <style>
   .app-section {
     position: relative;
+  }
+  .app-section::after {
+    content: "";
+    opacity: 0;
+    color: transparent;
+    transition: color .2s, opacity .2s;
+  }
+  .app-section.submitting::after {
+    content: "적용중입니다...";
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    background: #fffa;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    color: black;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5em;
+    opacity: 1;
+    z-index: 9999;
   }
   .app-toolbar {
     display: flex;
@@ -713,7 +786,7 @@
   }
   .app-table {
     width: 100%;
-    min-width: 1024px;
+    min-width: 1200px;
     border-collapse: collapse;
   }
   .app-table thead {
