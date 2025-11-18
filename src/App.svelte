@@ -3,9 +3,11 @@
   import "tom-select/dist/css/tom-select.css";
   import Swal from "sweetalert2";
   import Sidebar from "./sidebar.svelte";
-  import {onMount} from "svelte";
-  import {SvelteSet} from "svelte/reactivity";
+  import { onMount } from "svelte";
+  import { SvelteMap } from "svelte/reactivity";
   import Portal from "svelte-portal";
+
+  const useDev = false;
 
   interface 개별품목타입 {
     no_id: number;
@@ -30,8 +32,12 @@
     brand_disc_amount: number | string | undefined;
     discount_margin: number | string | undefined;
     discount_price: number | string | undefined;
+    link_def: boolean;
+    link_disc: boolean;
     per_user: {
       [key: string]: {
+        default_margin: number | string | undefined;
+        default_prov: number | string | undefined;
         discount_margin: number | string | undefined;
         discount_price: number | string | undefined;
       };
@@ -44,7 +50,7 @@
     mb_nick: string;
     mb_8: string;
   }
-  
+
   interface 품목테이블컬럼속성타입 {
     [key: string]: {
       width: string;
@@ -61,9 +67,10 @@
   let 선택된브랜드: string | undefined = $state();
   let 선택된브랜드품목 = $derived(선택된브랜드 ? 품목목록 && 품목목록[선택된브랜드] : undefined);
 
-  let 변경된행 = new SvelteSet<개별품목타입>();
+  let 변경된행 = new SvelteMap<개별품목타입["no_id"], 개별품목타입>();
+  if (useDev) $inspect(변경된행);
 
-  let 마진공급가자동계산 = $state(false);
+  let 마진공급가자동계산 = $derived(선택된브랜드품목?.every(품목 => 품목.default_margin && typeof 품목.default_margin == "object" && 품목.default_margin.link_def && 품목.default_margin.link_disc));
 
   let 아이디목록: 아이디목록타입[] | undefined = $state([]);
 
@@ -79,8 +86,12 @@
           title: "항목 삭제",
         },
       },
+      refreshThrottle: 0,
       placeholder: "아이디 선택... (복수 선택 가능)",
-      onChange: (value: string[]) => (선택된아이디 = value),
+      onChange: (value: string[]) => {
+        선택된아이디 = value;
+        if (document.querySelector(".ts-control input")) (document.querySelector(".ts-control input") as HTMLInputElement).value = "";
+      },
       maxOptions: undefined,
     });
   });
@@ -88,11 +99,11 @@
   let 선택된아이디: string[] = $state([]);
 
   let 품목테이블컬럼속성: 품목테이블컬럼속성타입 = $derived({
-    no_id: {width: "0%", display: false, label: ""},
-    품목명: {width: "30%", display: true, label: "품목명"},
-    소비자가: {width: "10%", display: true, label: "소비자가(원)"},
-    기본마진: {width: "10%", display: true, label: "기본 마진(%)"},
-    기본공급가: {width: "10%", display: true, label: "기본 공급가(원)"},
+    no_id: { width: "0%", display: false, label: "" },
+    품목명: { width: "30%", display: true, label: "품목명" },
+    소비자가: { width: "10%", display: true, label: "소비자가(원)" },
+    기본마진: { width: "10%", display: true, label: (선택된아이디.length > 0 ? "업체별 " : "") + "기본 마진(%)" },
+    기본공급가: { width: "10%", display: true, label: (선택된아이디.length > 0 ? "업체별 " : "") + "기본 공급가(원)" },
     할인마진: {
       width: "10%",
       display: true,
@@ -103,7 +114,7 @@
       display: true,
       label: (선택된아이디.length == 0 ? "기본 " : "업체별 ") + "할인 공급가(원)",
     },
-    할인수량: {width: "10%", display: true, label: "할인 수량(개)"},
+    할인수량: { width: "10%", display: true, label: "할인 수량(개)" },
     브랜드할인최소액: {
       width: "10%",
       display: true,
@@ -118,20 +129,27 @@
     discount_margin: undefined,
     discount_price: undefined,
     brand_disc_amount: undefined,
+    link_def: false,
+    link_disc: false,
   });
 
   let 내용변경여부 = $state(false);
 
   let 적용중여부 = $state(false);
 
-  let 적용반환값:{
-    method: string,
-    status: string,
-    error: string|null,
-    data: string[],
-  }|undefined|null = $state();
+  let 적용반환값:
+    | {
+        method: string;
+        status: string;
+        error: string | null;
+        data: string[];
+      }
+    | undefined
+    | null = $state();
 
-  const 설정초기화값 =  {
+  let 품목테이블바디: HTMLElement | undefined = $state();
+
+  const 설정초기화값 = {
     default_margin: 0,
     default_prov: 0,
     discount_qty: 0,
@@ -139,7 +157,9 @@
     discount_price: 0,
     brand_disc_amount: 0,
     per_user: {},
-  }
+    link_def: false,
+    link_disc: false,
+  };
 
   function 브랜드일괄편집필드리셋() {
     브랜드일괄편집필드 = {
@@ -149,6 +169,8 @@
       discount_margin: undefined,
       discount_price: undefined,
       brand_disc_amount: undefined,
+      link_def: false,
+      link_disc: false,
     };
   }
 
@@ -159,6 +181,7 @@
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Use-Dev": String(useDev),
         },
         body: JSON.stringify({
           key: "b2b_margin_setup",
@@ -168,7 +191,7 @@
       if (가져오기.ok) {
         const 결과: 품목목록타입 = await 가져오기.json();
         브랜드 = 결과 && Object.keys(결과);
-        브랜드.forEach((아이템) => {
+        브랜드.forEach(아이템 => {
           품목목록[아이템] = 결과[아이템].map((아이템: 개별품목타입) => {
             let default_margin;
             try {
@@ -205,7 +228,7 @@
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Use-Dev": "true",
+          "Use-Dev": String(useDev),
         },
         body: JSON.stringify({
           onlypartners: true,
@@ -228,95 +251,186 @@
     if (typeof 품목.default_margin != "object") return;
     if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
 
+    if (typeof 품목.default_margin.per_user != "object") 품목.default_margin.per_user = {};
+
     if (!품목.default_margin.per_user?.[아이디])
       품목.default_margin.per_user[아이디] = {
-        discount_margin: -1,
-        discount_price: -1,
+        default_margin: 0,
+        default_prov: 0,
+        discount_margin: 0,
+        discount_price: 0,
       };
   }
 
-  function 할인마진겟터(품목: 개별품목타입, 숫자로반환: boolean | undefined = false) {
-    if (typeof 품목.default_margin != "object") return;
-    if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
-    if (선택된아이디.length == 0) {
-      return 숫자로반환 ? 품목.default_margin.discount_margin : 로케일숫자로표시(품목.default_margin.discount_margin);
-    } else if (선택된아이디.length == 1) {
-      return 숫자로반환 ? 품목.default_margin.per_user?.[선택된아이디[0]]?.discount_margin : 로케일숫자로표시(품목.default_margin.per_user?.[선택된아이디[0]]?.discount_margin);
-    } else {
-      const 첫번째아이디값 = 선택된아이디.length ? 품목.default_margin.per_user?.[선택된아이디[0]]?.discount_margin : undefined;
-      for (const 각아이디 of 선택된아이디) {
-        if (첫번째아이디값 != 품목.default_margin.per_user?.[각아이디]?.discount_margin) return undefined;
+  function 기본마진겟터(품목: 개별품목타입 | 개별품목타입[]) {
+    const 게팅할품목 = Array.isArray(품목) ? 품목 : [품목];
+    let 반환할값;
+
+    for (품목 of 게팅할품목) {
+      if (typeof 품목.default_margin != "object") return;
+      if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
+      if (선택된아이디.length == 0) {
+        반환할값 = 로케일숫자로표시(품목.default_margin.default_margin);
+      } else {
+        const 첫번째아이디값 = 선택된아이디.length ? 품목.default_margin.per_user?.[선택된아이디[0]]?.default_margin : undefined;
+        for (const 각아이디 of 선택된아이디) {
+          if (첫번째아이디값 != 품목.default_margin.per_user?.[각아이디]?.default_margin) return undefined;
+        }
+        반환할값 = 로케일숫자로표시(첫번째아이디값);
       }
-      return 숫자로반환 ? 첫번째아이디값 : 로케일숫자로표시(첫번째아이디값);
+    }
+
+    return 반환할값;
+  }
+
+  function 기본마진셋터(v: string | number | undefined, 품목: 개별품목타입 | 개별품목타입[]) {
+    const 세팅할품목 = Array.isArray(품목) ? 품목 : [품목];
+
+    for (const 품목 of 세팅할품목) {
+      if (typeof 품목.default_margin != "object") return;
+      if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
+      if (선택된아이디.length == 0) {
+        품목.default_margin.default_margin = 숫자로변환(v ?? 품목.default_margin.default_margin);
+        if (품목.default_margin.link_def) 품목.default_margin.default_prov = parseFloat(String(품목.price)) * ((100 - parseFloat(String(숫자로변환(v ?? 품목.default_margin.default_margin)))) / 100);
+      } else {
+        for (const element of 선택된아이디) {
+          if (typeof 품목.default_margin != "object") return;
+          if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
+          유저별엔트리생성(품목, element);
+          품목.default_margin.per_user[element].default_margin = 숫자로변환(v ?? 품목.default_margin.default_margin);
+          if (품목.default_margin.link_def) 품목.default_margin.per_user[element].default_prov = parseFloat(String(품목.price)) * ((100 - parseFloat(String(품목.default_margin.per_user[element].default_margin))) / 100);
+        }
+        품목.default_margin.per_user = { ...품목.default_margin.per_user };
+      }
     }
   }
 
-  function 할인공급가겟터(품목: 개별품목타입, 숫자로반환: boolean | undefined = false) {
-    if (typeof 품목.default_margin != "object") return;
-    if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
-    if (선택된아이디.length == 0) {
-      return 숫자로반환 ? 품목.default_margin.discount_price : 로케일숫자로표시(품목.default_margin.discount_price);
-    } else if (선택된아이디.length == 1) {
-      return 숫자로반환 ? 품목.default_margin.per_user?.[선택된아이디[0]]?.discount_price : 로케일숫자로표시(품목.default_margin.per_user?.[선택된아이디[0]]?.discount_price);
-    } else {
-      const 첫번째아이디값 = 선택된아이디.length ? 품목.default_margin.per_user?.[선택된아이디[0]]?.discount_price : undefined;
-      for (const 각아이디 of 선택된아이디) {
-        if (첫번째아이디값 != 품목.default_margin.per_user?.[각아이디]?.discount_price) return undefined;
+  function 기본공급가겟터(품목: 개별품목타입 | 개별품목타입[]) {
+    const 게팅할품목 = Array.isArray(품목) ? 품목 : [품목];
+    let 반환할값;
+
+    for (const 품목 of 게팅할품목) {
+      if (typeof 품목.default_margin != "object") return;
+      if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
+      if (선택된아이디.length == 0) {
+        반환할값 = 로케일숫자로표시(품목.default_margin.default_prov);
+      } else {
+        const 첫번째아이디값 = 선택된아이디.length ? 품목.default_margin.per_user?.[선택된아이디[0]]?.default_prov : undefined;
+        for (const 각아이디 of 선택된아이디) {
+          if (첫번째아이디값 != 품목.default_margin.per_user?.[각아이디]?.default_prov) return undefined;
+        }
+        반환할값 = 로케일숫자로표시(첫번째아이디값);
       }
-      return 숫자로반환 ? 첫번째아이디값 : 로케일숫자로표시(첫번째아이디값);
     }
+
+    return 반환할값;
+  }
+
+  function 기본공급가셋터(v: string | number | undefined, 품목: 개별품목타입 | 개별품목타입[]) {
+    const 세팅할품목 = Array.isArray(품목) ? 품목 : [품목];
+
+    for (const 품목 of 세팅할품목) {
+      if (typeof 품목.default_margin != "object") return;
+      if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
+      if (선택된아이디.length == 0) {
+        품목.default_margin.default_prov = 숫자로변환(v ?? 품목.default_margin.default_margin);
+        if (품목.default_margin.link_def) 품목.default_margin.default_margin = 100 - (parseFloat(String(품목.default_margin.default_prov)) / parseFloat(String(품목.price))) * 100;
+      } else {
+        for (const element of 선택된아이디) {
+          if (typeof 품목.default_margin != "object") return;
+          if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
+          유저별엔트리생성(품목, element);
+          품목.default_margin.per_user[element].default_prov = 숫자로변환(v ?? 품목.default_margin.default_prov);
+          if (품목.default_margin.link_def) 품목.default_margin.per_user[element].default_margin = 100 - (parseFloat(String(품목.default_margin.per_user[element].default_prov)) / parseFloat(String(품목.price))) * 100;
+        }
+        품목.default_margin.per_user = { ...품목.default_margin.per_user };
+      }
+    }
+  }
+
+  function 할인마진겟터(품목: 개별품목타입 | 개별품목타입[]) {
+    const 게팅할품목 = Array.isArray(품목) ? 품목 : [품목];
+    let 반환할값;
+
+    for (const 품목 of 게팅할품목) {
+      if (typeof 품목.default_margin != "object") return;
+      if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
+      if (선택된아이디.length == 0) {
+        반환할값 = 로케일숫자로표시(품목.default_margin.discount_margin);
+      } else {
+        const 첫번째아이디값 = 선택된아이디.length ? 품목.default_margin.per_user?.[선택된아이디[0]]?.discount_margin : undefined;
+        for (const 각아이디 of 선택된아이디) {
+          if (첫번째아이디값 != 품목.default_margin.per_user?.[각아이디]?.discount_margin) return undefined;
+        }
+        반환할값 = 로케일숫자로표시(첫번째아이디값);
+      }
+    }
+    return 반환할값;
   }
 
   function 할인마진셋터(v: string | number | undefined, 품목: 개별품목타입 | 개별품목타입[]) {
     const 세팅할품목 = Array.isArray(품목) ? 품목 : [품목];
 
-    세팅할품목.forEach((품목) => {
+    for (const 품목 of 세팅할품목) {
       if (typeof 품목.default_margin != "object") return;
       if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
       if (선택된아이디.length == 0) {
         품목.default_margin.discount_margin = 숫자로변환(v ?? 품목.default_margin.default_margin);
-        if (마진공급가자동계산) 품목.default_margin.discount_price = parseFloat(String(품목.price)) * ((100 - parseFloat(String(숫자로변환(v ?? 품목.default_margin.default_margin)))) / 100);
-      } else if (선택된아이디.length == 1) {
-        유저별엔트리생성(품목, 선택된아이디[0]);
-        품목.default_margin.per_user[선택된아이디[0]].discount_margin = 숫자로변환(v ?? 품목.default_margin.default_margin);
-        if (마진공급가자동계산) 품목.default_margin.per_user[선택된아이디[0]].discount_price = parseFloat(String(품목.price)) * ((100 - parseFloat(String(품목.default_margin.per_user[선택된아이디[0]].discount_margin))) / 100);
+        if (품목.default_margin.link_disc) 품목.default_margin.discount_price = parseFloat(String(품목.price)) * ((100 - parseFloat(String(숫자로변환(v ?? 품목.default_margin.default_margin)))) / 100);
       } else {
-        선택된아이디.forEach((element) => {
+        for (const element of 선택된아이디) {
           if (typeof 품목.default_margin != "object") return;
           if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
           유저별엔트리생성(품목, element);
           품목.default_margin.per_user[element].discount_margin = 숫자로변환(v ?? 품목.default_margin.default_margin);
-          if (마진공급가자동계산) 품목.default_margin.per_user[element].discount_price = parseFloat(String(품목.price)) * ((100 - parseFloat(String(품목.default_margin.per_user[element].discount_margin))) / 100);
-        });
+          if (품목.default_margin.link_disc) 품목.default_margin.per_user[element].discount_price = parseFloat(String(품목.price)) * ((100 - parseFloat(String(품목.default_margin.per_user[element].discount_margin))) / 100);
+        }
+        품목.default_margin.per_user = { ...품목.default_margin.per_user };
       }
-      변경된행.add(품목);
-    });
+    }
+  }
+
+  function 할인공급가겟터(품목: 개별품목타입 | 개별품목타입[]) {
+    const 게팅할품목 = Array.isArray(품목) ? 품목 : [품목];
+    let 반환할값;
+
+    for (const 품목 of 게팅할품목) {
+      if (typeof 품목.default_margin != "object") return;
+      if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
+      if (선택된아이디.length == 0) {
+        반환할값 = 로케일숫자로표시(품목.default_margin.discount_price);
+      } else {
+        const 첫번째아이디값 = 선택된아이디.length ? 품목.default_margin.per_user?.[선택된아이디[0]]?.discount_price : undefined;
+        for (const 각아이디 of 선택된아이디) {
+          if (첫번째아이디값 != 품목.default_margin.per_user?.[각아이디]?.discount_price) return undefined;
+        }
+        반환할값 = 로케일숫자로표시(첫번째아이디값);
+      }
+    }
+
+    return 반환할값;
   }
 
   function 할인공급가셋터(v: string | number | undefined, 품목: 개별품목타입 | 개별품목타입[]) {
     const 세팅할품목 = Array.isArray(품목) ? 품목 : [품목];
 
-    세팅할품목.forEach((품목) => {
+    for (const 품목 of 세팅할품목) {
       if (typeof 품목.default_margin != "object") return;
       if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
       if (선택된아이디.length == 0) {
         품목.default_margin.discount_price = 숫자로변환(v ?? 품목.default_margin.default_margin);
-        품목.default_margin.discount_margin = 100 - (parseFloat(String(품목.default_margin.discount_price)) / parseFloat(String(품목.price))) * 100;
-      } else if (선택된아이디.length == 1) {
-        유저별엔트리생성(품목, 선택된아이디[0]);
-        품목.default_margin.per_user[선택된아이디[0]].discount_price = 숫자로변환(v ?? 품목.default_margin.default_prov);
-        품목.default_margin.per_user[선택된아이디[0]].discount_margin = 100 - (parseFloat(String(품목.default_margin.per_user[선택된아이디[0]].discount_price)) / parseFloat(String(품목.price))) * 100;
+        if (품목.default_margin.link_disc) 품목.default_margin.discount_margin = 100 - (parseFloat(String(품목.default_margin.discount_price)) / parseFloat(String(품목.price))) * 100;
       } else {
-        선택된아이디.forEach((element) => {
+        for (const element of 선택된아이디) {
           if (typeof 품목.default_margin != "object") return;
           if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
           유저별엔트리생성(품목, element);
           품목.default_margin.per_user[element].discount_price = 숫자로변환(v ?? 품목.default_margin.default_prov);
-          품목.default_margin.per_user[element].discount_margin = 100 - (parseFloat(String(품목.default_margin.per_user[element].discount_price)) / parseFloat(String(품목.price))) * 100;
-        });
+          if (품목.default_margin.link_disc) 품목.default_margin.per_user[element].discount_margin = 100 - (parseFloat(String(품목.default_margin.per_user[element].discount_price)) / parseFloat(String(품목.price))) * 100;
+        }
+        품목.default_margin.per_user = { ...품목.default_margin.per_user };
       }
-      변경된행.add(품목);
-    });
+    }
   }
 
   function 숫자로변환(값: string | number | undefined) {
@@ -334,64 +448,44 @@
     return String(값).endsWith(".") ? 값 : Intl.NumberFormat("ko-KR").format(parseFloat(String(값)));
   }
 
-  function 브랜드값일괄편집<Target extends Exclude<keyof 마진타입, "per_user">>(값: string | number, 타겟: Target) {
-    선택된브랜드품목?.forEach((품목) => {
+  function 브랜드값일괄편집<Target extends Exclude<keyof 마진타입, "per_user"> & Exclude<keyof 마진타입, "link_def"> & Exclude<keyof 마진타입, "link_disc">>(값: string | number, 타겟: Target) {
+    선택된브랜드품목?.forEach(품목 => {
       (품목.default_margin as 마진타입)[타겟] = 숫자로변환(값);
-      if (마진공급가자동계산) {
-        if (typeof 품목.default_margin != "object") return;
-        if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
-        switch (타겟) {
-          case "default_margin":
-            품목.default_margin.default_prov = parseFloat(String(품목.price)) * ((100 - parseFloat(String(품목.default_margin.default_margin))) / 100);
-            break;
-          case "default_prov":
-            품목.default_margin.default_margin = 100 - (parseFloat(String(품목.default_margin.default_prov)) / parseFloat(String(품목.price))) * 100;
-            break;
-        }
-      }
-      변경된행.add(품목);
+      변경된행.set($state.snapshot(품목).no_id, $state.snapshot(품목));
     });
   }
 
-  function 행업데이트(품목: 개별품목타입, 타겟: "default_margin" | "default_prov" | undefined = undefined) {
-    if (마진공급가자동계산 && 타겟) {
-      if (typeof 품목.default_margin != "object") return;
-      if (품목.default_margin == null) 품목.default_margin = structuredClone(설정초기화값);
-      switch (타겟) {
-        case "default_margin":
-          품목.default_margin.default_prov = parseFloat(String(품목.price)) * ((100 - parseFloat(String(품목.default_margin.default_margin))) / 100);
-          break;
-        case "default_prov":
-          품목.default_margin.default_margin = 100 - (parseFloat(String(품목.default_margin.default_prov)) / parseFloat(String(품목.price))) * 100;
-          break;
-      }
+  function 행업데이트(품목: 개별품목타입 | 개별품목타입[]) {
+    const 세팅할품목 = Array.isArray(품목) ? 품목 : [품목];
+
+    for (품목 of 세팅할품목) {
+      변경된행.set($state.snapshot(품목).no_id, $state.snapshot(품목));
     }
-    변경된행.add(품목);
   }
 
-  async function 적용 () {
+  async function 적용() {
     적용중여부 = true;
     try {
-      const 요청 = await fetch("https://b2b.soundcat.com/page/margin_setup_update.php",{
+      const 요청 = await fetch("https://b2b.soundcat.com/page/margin_setup_update.php", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Use-Dev": "true"
+          "Use-Dev": String(useDev),
         },
-        body: JSON.stringify(Array.from(변경된행))
+        body: JSON.stringify([...변경된행.values()]),
       });
 
       if (요청.ok) {
-        const 결과:typeof 적용반환값 = await 요청.json();
+        const 결과: typeof 적용반환값 = await 요청.json();
         await Swal.fire({
-          icon: 'success',
-          title: '작업이 성공적으로 이루어졌습니다.',
-          html: '&nbsp;',
-          confirmButtonText: '닫기',
+          icon: "success",
+          title: "작업이 성공적으로 이루어졌습니다.",
+          html: "&nbsp;",
+          confirmButtonText: "닫기",
           customClass: {
             htmlContainer: "successful-popup",
           },
-          willOpen: ()=>{
+          willOpen: () => {
             적용반환값 = 결과;
             적용중여부 = false;
           },
@@ -401,13 +495,18 @@
         변경된행.clear();
         품목목록사본 = structuredClone($state.snapshot(품목목록));
       } else {
-        throw new Error('서버에 접속하지 못했습니다: '+ JSON.stringify(요청));
+        throw new Error("서버에 접속하지 못했습니다: " + JSON.stringify(요청));
       }
-
     } catch (e) {
       console.error(e);
+      Swal.fire({
+        icon: "error",
+        title: "적용 실패했습니다.",
+        text: JSON.stringify(e) + "\n" + "다시 시도해보세요.",
+        confirmButtonText: "닫기",
+      });
     } finally {
-      적용중여부 = false
+      적용중여부 = false;
     }
   }
 
@@ -434,14 +533,58 @@
   });
 </script>
 
-<section class={["app-section",적용중여부&&"submitting"]}>
-  <Sidebar {브랜드} bind:선택된브랜드 품목목록가져오기={품목목록가져오기} />
+<svelte:window
+  onkeydown={e => {
+    if (품목테이블바디 && (e.target as HTMLElement)?.nodeName == "INPUT") {
+      const targetCell = (e.target as HTMLElement)?.closest("td");
+      const targetRow = (e.target as HTMLElement)?.closest("tr");
+      const targetBody = (e.target as HTMLElement)?.closest("tbody");
+      const rows = targetBody?.querySelectorAll("tr");
+      const cells = targetRow?.querySelectorAll("td");
+      const rowIndex = targetRow ? Array.from(rows ?? []).indexOf(targetRow) : -1;
+      const cellIndex = targetCell ? Array.from(cells ?? []).indexOf(targetCell) : -1;
+
+      if (e.key == "ArrowDown" && rows && rowIndex < (rows.length ?? -1) - 1) {
+        rows[rowIndex + 1].querySelectorAll("td")?.[cellIndex]?.querySelector("input")?.focus();
+      } else if (e.key == "ArrowUp" && rows && rowIndex > 0) {
+        rows[rowIndex - 1].querySelectorAll("td")?.[cellIndex]?.querySelector("input")?.focus();
+      }
+    }
+  }} />
+<section class={["app-section", 적용중여부 && "submitting"]}>
+  <Sidebar
+    {브랜드}
+    bind:선택된브랜드
+    {품목목록가져오기} />
   <div class="app-toolbar">
     <div class="app-user-select-container">
-      <select multiple class="app-user-select" bind:this={아이디입력상자}> </select>
+      <select
+        multiple
+        class="app-user-select"
+        bind:this={아이디입력상자}>
+      </select>
     </div>
     <div class="app-submit-div">
-      <label class="app-checkbox-label"> <input type="checkbox" bind:checked={마진공급가자동계산} />마진↔︎공급가 자동계산</label>
+      <label class="app-checkbox-label">
+        <i></i>
+        <input
+          type="checkbox"
+          bind:checked={마진공급가자동계산}
+          onclick={() => {
+            const 현재체크 = 마진공급가자동계산;
+            선택된브랜드품목?.forEach(품목 => {
+              if (품목.default_margin && typeof 품목.default_margin == "object") {
+                if (!현재체크) {
+                  품목.default_margin.link_def = true;
+                  품목.default_margin.link_disc = true;
+                } else {
+                  품목.default_margin.link_def = !품목.default_margin.link_def;
+                  품목.default_margin.link_disc = !품목.default_margin.link_disc;
+                }
+              }
+              변경된행.set($state.snapshot(품목).no_id, $state.snapshot(품목));
+            });
+          }} />마진↔︎공급가 자동계산</label>
       <button
         type="button"
         class={["cancel", 내용변경여부 || "disabled"]}
@@ -450,30 +593,37 @@
           품목목록 = structuredClone($state.snapshot(품목목록사본));
           브랜드일괄편집필드리셋();
         }}><i class="fas fa-redo"></i> 변경 취소</button>
-      <button type="button" class={["submit", 내용변경여부 || "disabled"]} onclick={적용}>
+      <button
+        type="button"
+        class={["submit", 내용변경여부 || "disabled"]}
+        onclick={적용}>
         <i class="fas fa-check"></i> 저장
       </button>
     </div>
   </div>
   {#if 브랜드 && 브랜드.length == 0}
-  <div class="loading">브랜드를 가져오는 중입니다...</div>
+    <div class="loading">브랜드를 가져오는 중입니다...</div>
   {:else if !브랜드}
-  <div class="failed">
-    <div>브랜드 목록 가져오기를 실패했습니다. 재시도하시겠습니까?</div>
-    <div>
-      <button class="retry-btn" onclick={() => 품목목록가져오기()}><i class="fas fa-redo"></i> 재시도</button>
+    <div class="failed">
+      <div>브랜드 목록 가져오기를 실패했습니다. 재시도하시겠습니까?</div>
+      <div>
+        <button
+          class="retry-btn"
+          onclick={() => 품목목록가져오기()}><i class="fas fa-redo"></i> 재시도</button>
+      </div>
     </div>
-  </div>
   {/if}
   {#if 아이디목록 && 아이디목록.length == 0}
-  <div class="loading">아이디 목록을 가져오는 중입니다...</div>
+    <div class="loading">아이디 목록을 가져오는 중입니다...</div>
   {:else if !아이디목록}
-  <div class="failed">
-    <div>아이디 목록 가져오기를 실패했습니다. 재시도하시겠습니까?</div>
-    <div>
-      <button class="retry-btn" onclick={() => 아이디가져오기()}><i class="fas fa-redo"></i> 재시도</button>
+    <div class="failed">
+      <div>아이디 목록 가져오기를 실패했습니다. 재시도하시겠습니까?</div>
+      <div>
+        <button
+          class="retry-btn"
+          onclick={() => 아이디가져오기()}><i class="fas fa-redo"></i> 재시도</button>
+      </div>
     </div>
-  </div>
   {/if}
   {#if 선택된브랜드 && 선택된브랜드품목}
     <div class="app-table-container">
@@ -510,10 +660,13 @@
               <div>
                 <input
                   type="text"
-                  onchange={(e) => 브랜드값일괄편집(e.currentTarget.value, "default_margin")}
+                  onchange={e => {
+                    기본마진셋터(e.currentTarget.value, 선택된브랜드품목);
+                    행업데이트(선택된브랜드품목);
+                  }}
                   bind:value={
                     () => 로케일숫자로표시(브랜드일괄편집필드.default_margin),
-                    (v) => {
+                    v => {
                       브랜드일괄편집필드.default_margin = 숫자로변환(v);
                     }
                   } />
@@ -523,10 +676,13 @@
               <div>
                 <input
                   type="text"
-                  onchange={(e) => 할인마진셋터(e.currentTarget.value, 선택된브랜드품목)}
+                  onchange={e => {
+                    할인마진셋터(e.currentTarget.value, 선택된브랜드품목);
+                    행업데이트(선택된브랜드품목);
+                  }}
                   bind:value={
                     () => 로케일숫자로표시(브랜드일괄편집필드.discount_margin),
-                    (v) => {
+                    v => {
                       브랜드일괄편집필드.discount_margin = 숫자로변환(v);
                     }
                   } />
@@ -536,10 +692,10 @@
               <div>
                 <input
                   type="text"
-                  onchange={(e) => 브랜드값일괄편집(e.currentTarget.value, "discount_qty")}
+                  onchange={e => 브랜드값일괄편집(e.currentTarget.value, "discount_qty")}
                   bind:value={
                     () => 로케일숫자로표시(브랜드일괄편집필드.discount_qty),
-                    (v) => {
+                    v => {
                       브랜드일괄편집필드.discount_qty = 숫자로변환(v);
                     }
                   } />
@@ -548,118 +704,147 @@
               <div>
                 <input
                   type="text"
-                  onchange={(e) => 브랜드값일괄편집(e.currentTarget.value, "brand_disc_amount")}
+                  onchange={e => 브랜드값일괄편집(e.currentTarget.value, "brand_disc_amount")}
                   bind:value={
                     () => 로케일숫자로표시(브랜드일괄편집필드.brand_disc_amount),
-                    (v) => {
+                    v => {
                       브랜드일괄편집필드.brand_disc_amount = 숫자로변환(v);
                     }
                   } />
               </div></td>
           </tr>
-          {#each 선택된브랜드품목 as 품목}
-            <tr>
-              <td><div><span>{품목.product}</span></div></td>
-              <td>
-                <div style="text-align: center;">
-                  <span>{Intl.NumberFormat("ko-KR").format(품목.price)}</span>
-                </div></td>
-              {#if typeof 품목.default_margin == "object"}
-                <td>
-                  <div>
-                    <input
-                      type="text"
-                      onchange={() => 행업데이트(품목, "default_margin")}
-                      bind:value={
-                        () => 로케일숫자로표시((품목.default_margin as 마진타입).default_margin),
-                        (v) => {
-                          (품목.default_margin as 마진타입).default_margin = 숫자로변환(v);
-                        }
-                      } />
-                  </div></td>
-                <td>
-                  <div>
-                    <input
-                      type="text"
-                      onchange={() => 행업데이트(품목, "default_prov")}
-                      bind:value={
-                        () => 로케일숫자로표시((품목.default_margin as 마진타입).default_prov),
-                        (v) => {
-                          (품목.default_margin as 마진타입).default_prov = 숫자로변환(v);
-                        }
-                      } />
-                  </div></td>
-                <td>
-                  <div>
-                    <input
-                      type="text"
-                      onchange={() => 행업데이트(품목)}
-                      bind:value={
-                        () => 할인마진겟터(품목),
-                        (v) => {
-                          할인마진셋터(v, 품목);
-                        }
-                      } />
-                  </div></td>
-                <td>
-                  <div>
-                    <input
-                      type="text"
-                      onchange={() => 행업데이트(품목)}
-                      bind:value={
-                        () => 할인공급가겟터(품목),
-                        (v) => {
-                          할인공급가셋터(v, 품목);
-                        }
-                      } />
-                  </div></td>
-                <td>
-                  <div>
-                    <input
-                      type="text"
-                      onchange={() => 행업데이트(품목)}
-                      bind:value={
-                        () => 로케일숫자로표시((품목.default_margin as 마진타입).discount_qty),
-                        (v) => {
-                          (품목.default_margin as 마진타입).discount_qty = 숫자로변환(v);
-                        }
-                      } />
-                  </div></td>
-                <td>
-                  <div>
-                    <input
-                      type="text"
-                      onchange={() => 행업데이트(품목)}
-                      bind:value={
-                        () => 로케일숫자로표시((품목.default_margin as 마진타입).brand_disc_amount),
-                        (v) => {
-                          (품목.default_margin as 마진타입).brand_disc_amount = 숫자로변환(v);
-                        }
-                      } />
-                  </div></td>
-              {/if}
-            </tr>
-          {/each}
         </tbody>
+        {#if 선택된브랜드품목.length}
+          <tbody bind:this={품목테이블바디}>
+            {#each 선택된브랜드품목 as 품목}
+              <tr>
+                <td><div><span>{품목.product}</span></div></td>
+                <td>
+                  <div style="text-align: center;">
+                    <span>{Intl.NumberFormat("ko-KR").format(품목.price)}</span>
+                  </div></td>
+                {#if typeof 품목.default_margin == "object"}
+                  <td>
+                    <div>
+                      <input
+                        type="text"
+                        onchange={() => 행업데이트(품목)}
+                        bind:value={
+                          () => 기본마진겟터(품목),
+                          v => {
+                            기본마진셋터(v, 품목);
+                          }
+                        } />
+                    </div>
+                    <button
+                      class="link"
+                      onclick={() => {
+                        if (품목.default_margin && typeof 품목.default_margin == "object") 품목.default_margin.link_def = !품목.default_margin.link_def;
+                        변경된행.set($state.snapshot(품목).no_id, $state.snapshot(품목));
+                      }}
+                      aria-label="기본마진-공급가 자동계산"
+                      ><i class={["fas", 품목.default_margin?.link_def ? "fa-link" : "fa-unlink"]}></i>
+                      <b>기본마진↔︎공급가 자동계산</b>
+                    </button>
+                  </td>
+                  <td>
+                    <div>
+                      <input
+                        type="text"
+                        onchange={() => 행업데이트(품목)}
+                        bind:value={
+                          () => 기본공급가겟터(품목),
+                          v => {
+                            기본공급가셋터(v, 품목);
+                          }
+                        } />
+                    </div></td>
+                  <td>
+                    <div>
+                      <input
+                        type="text"
+                        onchange={() => 행업데이트(품목)}
+                        bind:value={
+                          () => 할인마진겟터(품목),
+                          v => {
+                            할인마진셋터(v, 품목);
+                          }
+                        } />
+                    </div>
+                    <button
+                      class="link"
+                      onclick={() => {
+                        if (품목.default_margin && typeof 품목.default_margin == "object") 품목.default_margin.link_disc = !품목.default_margin.link_disc;
+                        변경된행.set($state.snapshot(품목).no_id, $state.snapshot(품목));
+                      }}
+                      aria-label="할인마진-공급가 자동계산"
+                      ><i class={["fas", 품목.default_margin?.link_disc ? "fa-link" : "fa-unlink"]}></i>
+                      <b>할인마진↔︎공급가 자동계산</b>
+                    </button>
+                  </td>
+                  <td>
+                    <div>
+                      <input
+                        type="text"
+                        onchange={() => 행업데이트(품목)}
+                        bind:value={
+                          () => 할인공급가겟터(품목),
+                          v => {
+                            할인공급가셋터(v, 품목);
+                          }
+                        } />
+                    </div></td>
+                  <td>
+                    <div>
+                      <input
+                        type="text"
+                        onchange={() => 행업데이트(품목)}
+                        bind:value={
+                          () => 로케일숫자로표시((품목.default_margin as 마진타입).discount_qty),
+                          v => {
+                            (품목.default_margin as 마진타입).discount_qty = 숫자로변환(v);
+                          }
+                        } />
+                    </div></td>
+                  <td>
+                    <div>
+                      <input
+                        type="text"
+                        onchange={() => 행업데이트(품목)}
+                        bind:value={
+                          () => 로케일숫자로표시((품목.default_margin as 마진타입).brand_disc_amount),
+                          v => {
+                            (품목.default_margin as 마진타입).brand_disc_amount = 숫자로변환(v);
+                          }
+                        } />
+                    </div></td>
+                {/if}
+              </tr>
+            {/each}
+          </tbody>
+        {/if}
       </table>
     </div>
+  {:else}
+    <div class="nobrand">좌측 사이드바를 클릭하여 브랜드를 선택하세요.</div>
   {/if}
 </section>
 {#if 적용반환값}
-<Portal target=".successful-popup">
-<div>
-<div>아래 품목에 적용되었습니다.</div>
-<details>
-  <summary>적용된 품목 보기</summary>
-  <div>
-    <code>
-      <pre>{적용반환값.data?.join("\n")}</pre>
-    </code>
-  </div>
-</details>
-</div>
-</Portal>
+  <Portal target=".successful-popup">
+    <div>
+      <div>아래 품목에 적용되었습니다.</div>
+      <details>
+        <summary>적용된 품목 보기</summary>
+        <div>
+          <code>
+            <pre>{적용반환값.data?.join("\n")}</pre>
+          </code>
+        </div>
+      </details>
+    </div>
+  </Portal>
 {/if}
+
 <style>
   .app-section {
     position: relative;
@@ -668,7 +853,9 @@
     content: "";
     opacity: 0;
     color: transparent;
-    transition: color .2s, opacity .2s;
+    transition:
+      color 0.2s,
+      opacity 0.2s;
   }
   .app-section.submitting::after {
     content: "적용중입니다...";
@@ -707,47 +894,47 @@
     display: flex;
     align-items: center;
     position: relative;
+    gap: 0.2em;
   }
   .app-checkbox-label input[type="checkbox"] {
     width: 0;
     height: 0;
     overflow: hidden;
   }
-  .app-checkbox-label:has(input[type="checkbox"])::before {
-    content: "";
-    display: inline-block;
-    width: 1em;
-    height: 1em;
+  .app-checkbox-label:has(input[type="checkbox"]) i {
+    position: relative;
+    display: flex;
+    width: calc(1em + 4px);
+    height: calc(1em + 4px);
     border-radius: 4px;
     border: 2px solid #ddd;
+    align-items: center;
+    justify-content: center;
   }
-  .app-checkbox-label:has(input[type="checkbox"]:checked)::after {
+  .app-checkbox-label:has(input[type="checkbox"]:checked) i::after {
     content: "";
-    position: absolute;
-    display: inline-block;
+    display: block;
     width: calc(1em - 2px);
     height: calc(1em - 2px);
-    left: 3px;
-    top: 3px;
     border-radius: 3px;
     background: rgb(10, 127, 251);
   }
-  .app-checkbox-label:has(input[type="checkbox"]):hover::before {
-    border: 2px solid #bbb;
+  .app-checkbox-label:has(input[type="checkbox"]):hover i {
+    border-color: #bbb;
   }
-  .app-checkbox-label:has(input[type="checkbox"]:focus)::before {
+  .app-checkbox-label:has(input[type="checkbox"]:focus) i {
     border: 2px solid rgb(10, 127, 251) !important;
   }
-  .app-checkbox-label:has(input[type="checkbox"]:active)::before {
+  .app-checkbox-label:has(input[type="checkbox"]:active) i {
     background: #eee;
   }
-  .app-checkbox-label:has(input[type="checkbox"]:checked)::before {
+  .app-checkbox-label:has(input[type="checkbox"]:checked) i {
     border: 2px solid rgb(10, 127, 251);
   }
-  .app-checkbox-label:has(input[type="checkbox"]:checked):hover::after {
-    background: rgb(95, 164, 237);
+  .app-checkbox-label:has(input[type="checkbox"]:checked):hover i::after {
+    background: rgb(95, 164, 237) !important;
   }
-  .app-checkbox-label:has(input[type="checkbox"]:active:checked)::after {
+  .app-checkbox-label:has(input[type="checkbox"]:active:checked) i::after {
     background: rgb(16, 99, 189);
   }
   .app-submit-div button {
@@ -781,7 +968,7 @@
   .app-table-container {
     margin-top: 1em;
     overflow-x: auto;
-    height: calc(100vh - calc(160px + 5em));
+    height: calc(100vh - calc(216px + 5em));
     overflow-y: auto;
   }
   .app-table {
@@ -794,20 +981,69 @@
     box-shadow: 0 2px 4px #0002;
     position: sticky;
     top: 0;
+    z-index: 3;
+    text-align: center;
   }
   .app-table tr {
     border-bottom: 1px solid #ddd;
   }
   .app-table :is(th, td) {
     height: 1em;
+    position: relative;
   }
   .app-table :is(th, td) div {
     padding: 0.5em;
   }
   .app-table :is(th, td) span {
-    padding: 0.5em;
     word-break: keep-all;
     overflow-wrap: break-word;
+  }
+  .app-table button.link {
+    position: absolute;
+    top: 50%;
+    left: 100%;
+    transform: translate(-50%, -50%);
+    border-radius: 999px;
+    color: #666;
+    font-size: 0.8em;
+    padding: 0.5rem;
+    box-shadow: 0 2px 4px #0003;
+    z-index: 2;
+    opacity: 1;
+    border: none;
+    background: white;
+    margin: 0;
+    width: 2rem;
+    height: 2rem;
+    cursor: pointer;
+  }
+  .app-table button.link b {
+    display: block;
+    position: absolute;
+    bottom: calc(100% + 5px);
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: 5px;
+    padding: 0.5em;
+    color: white;
+    background: #0009;
+    width: max-content;
+    pointer-events: none;
+    opacity: 0;
+    transition: 0.2s;
+  }
+  .app-table button.link:hover {
+    filter: brightness(0.9);
+  }
+  .app-table button.link:hover b {
+    opacity: 1;
+  }
+  .app-table button.link:active {
+    filter: brightness(0.9);
+    transform: translate(-50%, calc(-50% + 1px));
+  }
+  .app-table button.link i.fa-unlink {
+    opacity: 0.5;
   }
   .app-table td input[type="text"] {
     width: 100%;
@@ -858,6 +1094,18 @@
   .retry-btn:active {
     filter: brightness(1);
     transform: translateY(1px);
+  }
+  .nobrand {
+    width: 100%;
+    height: 600px;
+    background: #eee;
+    border-radius: 1em;
+    margin-top: 1em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2em;
+    color: #666;
   }
   @media screen and (max-width: 529px) {
     .app-table-container {
