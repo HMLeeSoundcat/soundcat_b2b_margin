@@ -44,7 +44,7 @@
   </aside>
   <button
     aria-label="브랜드 {사이드바열림 ? '닫기' : '보기'}"
-    class={[사이드바열림 && "opened", "app-sidebar-btn"]}
+    class={[사이드바열림 && "opened", "app-sidebar-btn", !선택된브랜드 && "nobrand"]}
     onclick={() => (사이드바열림 = !사이드바열림)}>
     <i class={[`fas fa-angle-double-${사이드바열림 ? "left" : "right"}`]}></i>
   </button>
@@ -76,6 +76,8 @@
     overflow-y: auto;
     pointer-events: all;
     background: white;
+    z-index: 2;
+    position: relative;
   }
   nav {
     height: 100%;
@@ -117,12 +119,17 @@
     border: 1px solid #ddd;
     border-left: none !important;
     background: #eee;
-    padding: 1em;
+    padding: 1em 0 1em 1em;
     border-radius: 0 1em 1em 0;
     font-size: 1em;
     transition: 0.2s;
     opacity: 0.5;
     pointer-events: all;
+    position: relative;
+    z-index: 1;
+    width: calc(3em + 0.5em);
+    transform: translateX(-0.5em);
+    cursor: pointer;
   }
   .app-sidebar-btn.opened {
     opacity: 1;
@@ -164,5 +171,21 @@
   .retry-btn:active {
     filter: brightness(1);
     transform: translateY(1px);
+  }
+  .nobrand:not(.opened) {
+    opacity: 1;
+    animation-name: 왔다리갔다리;
+    animation-iteration-count: infinite;
+    animation-duration: 0.5s;
+    animation-direction: alternate;
+  }
+  @keyframes 왔다리갔다리 {
+    0% {
+      transform: translateX(-0.5em);
+    }
+    100% {
+      transform: translateX(0em);
+      background: rgb(141, 196, 255);
+    }
   }
 </style>
