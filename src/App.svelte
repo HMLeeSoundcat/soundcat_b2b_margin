@@ -3,7 +3,7 @@
   import "tom-select/dist/css/tom-select.css";
   import Swal from "sweetalert2";
   import Sidebar from "./sidebar.svelte";
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import { SvelteMap } from "svelte/reactivity";
   import Portal from "svelte-portal";
 
@@ -19,6 +19,7 @@
     soldout: number;
     price: number;
     default_margin: null | string | 마진타입;
+    href: string | undefined;
   }
 
   interface 품목목록타입 {
@@ -59,13 +60,84 @@
     };
   }
 
+  const 품목정렬방법타입 = { name_asc: "품목명 오름차순", name_desc: "품목명 내림차순", noid_desc: "등록 최신순", noid_asc: "등록 오래된순", price_asc: "가격 오름차순", price_desc: "가격 내림차순" } as const;
+
+  let 품목정렬방법: keyof typeof 품목정렬방법타입 = $state("name_asc");
+
   let 품목목록: 품목목록타입 = $state({});
   let 품목목록사본: 품목목록타입 = $state({});
 
   let 브랜드: string[] | undefined = $state([]);
 
+  let 상세DB데이터:
+    | {
+        [key: string]: string;
+      }
+    | undefined = $state();
+
   let 선택된브랜드: string | undefined = $state();
-  let 선택된브랜드품목 = $derived(선택된브랜드 ? 품목목록 && 품목목록[선택된브랜드] : undefined);
+  let 선택된브랜드품목 = $derived.by(() => {
+    if (!선택된브랜드) return;
+    let type: "asc" | "desc" = "asc";
+
+    switch (품목정렬방법) {
+      case "name_asc":
+        type = "asc";
+        break;
+      case "name_desc":
+        type = "desc";
+        break;
+      case "noid_asc":
+        type = "asc";
+        break;
+      case "noid_desc":
+        type = "desc";
+        break;
+      case "price_asc":
+        type = "asc";
+        break;
+      case "price_desc":
+        type = "desc";
+        break;
+    }
+
+    let mapped = 선택된브랜드
+      ? 품목목록 &&
+        품목목록[선택된브랜드].map((x, i) => {
+          switch (품목정렬방법) {
+            case "name_asc":
+              return { index: i, value: x.product.toLowerCase() };
+            case "name_desc":
+              return { index: i, value: x.product.toLowerCase() };
+            case "noid_asc":
+              return { index: i, value: parseInt(String(x.no_id)) };
+            case "noid_desc":
+              return { index: i, value: parseInt(String(x.no_id)) };
+            case "price_asc":
+              return { index: i, value: parseInt(String(x.price)) };
+            case "price_desc":
+              return { index: i, value: parseInt(String(x.price)) };
+          }
+        })
+      : undefined;
+
+    if (mapped) {
+      if (type === "asc") {
+        mapped.sort((a, b) => {
+          return +(a.value > b.value) || +(a.value === b.value) - 1;
+        });
+      } else {
+        mapped.sort((a, b) => {
+          return +(a.value < b.value) || +(a.value === b.value) - 1;
+        });
+      }
+
+      const result = mapped.map(el => {
+        return 품목목록[선택된브랜드 as string][el.index];
+      });
+      return result;
+    }
+  });
 
   let 변경된행 = new SvelteMap<개별품목타입["no_id"], 개별품목타입>();
   if (useDev) $inspect(변경된행);
@@ -510,7 +582,83 @@
     }
   }
 
+  async function 상세DB가져오기() {
+    if (!상세DB데이터) 상세DB데이터 = {};
+    let page = 1;
+    while (true) {
+      try {
+        const 요청 = await fetch("https://b2b.soundcat.com/bbs/board.php?bo_table=prod_db&api=json&scope=href,wr_2&page=" + page + (useDev ? "&usedev=true" : ""), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        });
+
+        if (요청.ok) {
+          const 결과 = await 요청.json();
+
+          if (결과.status == "success") {
+            const 데이터 = 결과.data;
+            for (const 항목 of 데이터) {
+              if (항목["wr_2"]) {
+                try {
+                  const 항목나열 = JSON.parse(항목["wr_2"]);
+                  if (Array.isArray(항목나열)) {
+                    for (const element of 항목나열) {
+                      상세DB데이터[element] = 항목["href"];
+                    }
+                  }
+                } catch (e) {
+                  상세DB데이터[항목["wr_2"]] = 항목["href"];
+                }
+              }
+            }
+            page++;
+          } else {
+            throw new Error("상세DB 목록 조회 실패");
+          }
+        } else {
+          throw new Error("상세DB 서버 접속 실패");
+        }
+      } catch (e) {
+        console.log(e);
+        break;
+      }
+    }
+  }
+
+  const 테이블셀상하이동 = async (e: KeyboardEvent) => {
+    if (품목테이블바디 && (e.target as HTMLElement)?.nodeName == "INPUT") {
+      const targetCell = (e.target as HTMLElement)?.closest("td");
+      const targetRow = (e.target as HTMLElement)?.closest("tr");
+      const targetBody = (e.target as HTMLElement)?.closest("tbody");
+      const rows = targetBody?.querySelectorAll("tr");
+      const cells = targetRow?.querySelectorAll("td");
+      const rowIndex = targetRow ? Array.from(rows ?? []).indexOf(targetRow) : -1;
+      const cellIndex = targetCell ? Array.from(cells ?? []).indexOf(targetCell) : -1;
+
+      let 타겟;
+      if (e.key == "ArrowDown" && rows && rowIndex < (rows.length ?? -1) - 1) {
+        타겟 = rows[rowIndex + 1].querySelectorAll("td")?.[cellIndex]?.querySelector("input");
+      } else if (e.key == "ArrowUp" && rows && rowIndex > 0) {
+        타겟 = rows[rowIndex - 1].querySelectorAll("td")?.[cellIndex]?.querySelector("input");
+      }
+      if (타겟) {
+        타겟?.focus();
+        setTimeout(() => 타겟?.select(), 0);
+      }
+    }
+  };
+
+  function 포인터업(e: PointerEvent) {
+    if ((e.target as HTMLElement).nodeName == "INPUT") {
+      (e.target as HTMLInputElement)?.select();
+    }
+  }
+
   onMount(async () => {
+    상세DB가져오기();
     품목목록가져오기();
     await 아이디가져오기();
   });
@@ -531,26 +679,19 @@
   $effect(() => {
     내용변경여부 = 변경된행.size > 0 ? true : false;
   });
+
+  $effect(() => {
+    if (품목목록 && 상세DB데이터) {
+      for (const 브랜드항목 of Object.entries(품목목록)) {
+        for (const 품목 of 브랜드항목[1]) 품목.href = 상세DB데이터[품목.PROD_CD];
+      }
+    }
+  });
 </script>
 
 <svelte:window
-  onkeydown={e => {
-    if (품목테이블바디 && (e.target as HTMLElement)?.nodeName == "INPUT") {
-      const targetCell = (e.target as HTMLElement)?.closest("td");
-      const targetRow = (e.target as HTMLElement)?.closest("tr");
-      const targetBody = (e.target as HTMLElement)?.closest("tbody");
-      const rows = targetBody?.querySelectorAll("tr");
-      const cells = targetRow?.querySelectorAll("td");
-      const rowIndex = targetRow ? Array.from(rows ?? []).indexOf(targetRow) : -1;
-      const cellIndex = targetCell ? Array.from(cells ?? []).indexOf(targetCell) : -1;
-
-      if (e.key == "ArrowDown" && rows && rowIndex < (rows.length ?? -1) - 1) {
-        rows[rowIndex + 1].querySelectorAll("td")?.[cellIndex]?.querySelector("input")?.focus();
-      } else if (e.key == "ArrowUp" && rows && rowIndex > 0) {
-        rows[rowIndex - 1].querySelectorAll("td")?.[cellIndex]?.querySelector("input")?.focus();
-      }
-    }
-  }} />
+  onkeydown={테이블셀상하이동}
+  onpointerup={포인터업} />
 <section class={["app-section", 적용중여부 && "submitting"]}>
   <Sidebar
     {브랜드}
@@ -562,6 +703,17 @@
         multiple
         class="app-user-select"
         bind:this={아이디입력상자}>
+      </select>
+    </div>
+    <div>
+      <select
+        name="item_order"
+        id="item_order"
+        bind:value={품목정렬방법}
+        placeholder="정렬방법">
+        {#each Object.entries(품목정렬방법타입) as 정렬방법}
+          <option value={정렬방법[0]}>{정렬방법[1]}</option>
+        {/each}
       </select>
     </div>
     <div class="app-submit-div">
@@ -584,7 +736,7 @@
               }
               변경된행.set($state.snapshot(품목).no_id, $state.snapshot(품목));
             });
-          }} />마진↔︎공급가 자동계산</label>
+          }} />선택된 브랜드 마진↔︎공급가 자동계산</label>
       <button
         type="button"
         class={["cancel", 내용변경여부 || "disabled"]}
@@ -651,8 +803,8 @@
         </thead>
         <tbody>
           <tr>
-            <td
-              ><div>
+            <td>
+              <div>
                 <span><b>{선택된브랜드} 브랜드 전체 수정</b> (값 입력 후 엔터)</span>
               </div></td>
             <td></td>
@@ -666,7 +818,7 @@
                   }}
                   bind:value={
                     () => 로케일숫자로표시(브랜드일괄편집필드.default_margin),
-                    v => {
+                    (v: string | number) => {
                       브랜드일괄편집필드.default_margin = 숫자로변환(v);
                     }
                   } />
@@ -682,7 +834,7 @@
                   }}
                   bind:value={
                     () => 로케일숫자로표시(브랜드일괄편집필드.discount_margin),
-                    v => {
+                    (v: string | number) => {
                       브랜드일괄편집필드.discount_margin = 숫자로변환(v);
                     }
                   } />
@@ -695,7 +847,7 @@
                   onchange={e => 브랜드값일괄편집(e.currentTarget.value, "discount_qty")}
                   bind:value={
                     () => 로케일숫자로표시(브랜드일괄편집필드.discount_qty),
-                    v => {
+                    (v: string | number) => {
                       브랜드일괄편집필드.discount_qty = 숫자로변환(v);
                     }
                   } />
@@ -707,7 +859,7 @@
                   onchange={e => 브랜드값일괄편집(e.currentTarget.value, "brand_disc_amount")}
                   bind:value={
                     () => 로케일숫자로표시(브랜드일괄편집필드.brand_disc_amount),
-                    v => {
+                    (v: string | number) => {
                       브랜드일괄편집필드.brand_disc_amount = 숫자로변환(v);
                     }
                   } />
@@ -718,7 +870,18 @@
           <tbody bind:this={품목테이블바디}>
             {#each 선택된브랜드품목 as 품목}
               <tr>
-                <td><div><span>{품목.product}</span></div></td>
+                <td>
+                  <div>
+                    <span>
+                      {품목.product}
+                      {#if 품목.href}
+                        <a
+                          class="download_db"
+                          target="_blank"
+                          href={품목.href}>(상세DB 보기)</a>
+                      {/if}
+                    </span>
+                  </div></td>
                 <td>
                   <div style="text-align: center;">
                     <span>{Intl.NumberFormat("ko-KR").format(품목.price)}</span>
@@ -731,7 +894,7 @@
                         onchange={() => 행업데이트(품목)}
                         bind:value={
                           () => 기본마진겟터(품목),
-                          v => {
+                          (v: string | number | undefined) => {
                             기본마진셋터(v, 품목);
                           }
                         } />
@@ -754,7 +917,7 @@
                         onchange={() => 행업데이트(품목)}
                         bind:value={
                           () => 기본공급가겟터(품목),
-                          v => {
+                          (v: string | number | undefined) => {
                             기본공급가셋터(v, 품목);
                           }
                         } />
@@ -766,7 +929,7 @@
                         onchange={() => 행업데이트(품목)}
                         bind:value={
                           () => 할인마진겟터(품목),
-                          v => {
+                          (v: string | number | undefined) => {
                             할인마진셋터(v, 품목);
                           }
                         } />
@@ -789,7 +952,7 @@
                         onchange={() => 행업데이트(품목)}
                         bind:value={
                           () => 할인공급가겟터(품목),
-                          v => {
+                          (v: string | number | undefined) => {
                             할인공급가셋터(v, 품목);
                           }
                         } />
@@ -801,7 +964,7 @@
                         onchange={() => 행업데이트(품목)}
                         bind:value={
                           () => 로케일숫자로표시((품목.default_margin as 마진타입).discount_qty),
-                          v => {
+                          (v: string | number | undefined) => {
                             (품목.default_margin as 마진타입).discount_qty = 숫자로변환(v);
                           }
                         } />
@@ -813,7 +976,7 @@
                         onchange={() => 행업데이트(품목)}
                         bind:value={
                           () => 로케일숫자로표시((품목.default_margin as 마진타입).brand_disc_amount),
-                          v => {
+                          (v: string | number | undefined) => {
                             (품목.default_margin as 마진타입).brand_disc_amount = 숫자로변환(v);
                           }
                         } />
@@ -880,6 +1043,7 @@
     gap: 1em;
     margin-top: 1em;
     justify-content: flex-end;
+    align-items: center;
     flex-wrap: wrap;
   }
   .app-user-select-container {
@@ -900,6 +1064,7 @@
     width: 0;
     height: 0;
     overflow: hidden;
+    margin: 0;
   }
   .app-checkbox-label:has(input[type="checkbox"]) i {
     position: relative;
@@ -1106,6 +1271,24 @@
     justify-content: center;
     font-size: 2em;
     color: #666;
+  }
+  #item_order {
+    display: block;
+    padding: 0.5em 1em;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    font-size: 15px;
+  }
+  .download_db {
+    font-size: 0.8em;
+    color: black;
+    text-decoration: underline;
+  }
+  .download_db:hover {
+    color: #0d6efd;
+  }
+  .download_db:active {
+    color: black;
   }
   @media screen and (max-width: 529px) {
     .app-table-container {
