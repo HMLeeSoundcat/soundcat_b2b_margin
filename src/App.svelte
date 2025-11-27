@@ -140,7 +140,7 @@
   });
 
   let 변경된행 = new SvelteMap<개별품목타입["no_id"], 개별품목타입>();
-  if (useDev) $inspect(변경된행);
+  if (useDev) $inspect(선택된브랜드품목);
 
   let 마진공급가자동계산 = $derived(선택된브랜드품목?.every(품목 => 품목.default_margin && typeof 품목.default_margin == "object" && 품목.default_margin.link_def && 품목.default_margin.link_disc));
 
@@ -869,8 +869,8 @@
         {#if 선택된브랜드품목.length}
           <tbody bind:this={품목테이블바디}>
             {#each 선택된브랜드품목 as 품목}
-              <tr>
-                <td>
+              <tr class:hidden={parseInt(String(품목.hidden))}>
+                <td class="product_cell">
                   <div>
                     <span>
                       {품목.product}
@@ -1152,6 +1152,12 @@
   .app-table tr {
     border-bottom: 1px solid #ddd;
   }
+  .app-table tr.hidden .product_cell {
+    color: #0005;
+  }
+  .app-table tr.hidden .product_cell span::after {
+    content: " (숨겨짐)";
+  }
   .app-table :is(th, td) {
     height: 1em;
     position: relative;
@@ -1230,6 +1236,9 @@
   .app-table td input[type="text"]:focus {
     border-color: rgb(10, 127, 251);
     transition: border 0s;
+  }
+  .app-table tr:has(:focus) {
+    background: #0001;
   }
   .loading,
   .failed {
