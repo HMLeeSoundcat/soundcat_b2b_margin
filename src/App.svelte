@@ -67,6 +67,8 @@
 
   let 브랜드: string[] | undefined = $state([]);
 
+  let 브랜드파라미터: string|undefined|null = $state();
+
   let 상세DB데이터:
     | {
         [key: string]: string;
@@ -252,6 +254,7 @@
           });
         });
         품목목록사본 = structuredClone($state.snapshot(품목목록));
+        if (브랜드파라미터) 선택된브랜드 = 브랜드파라미터;
       } else {
         throw new Error("서버 접속 실패." + JSON.stringify(가져오기));
       }
@@ -549,6 +552,8 @@
   }
 
   onMount(async () => {
+    const url = new URL(location.href);
+    브랜드파라미터 = url.searchParams.get("brand");
     상세DB가져오기();
     품목목록가져오기();
     await 아이디가져오기();
@@ -578,6 +583,13 @@
       }
     }
   });
+
+  $effect(()=>{
+    if (!선택된브랜드) return;
+    const url = new URL(location.href);
+    url.searchParams.set('brand',선택된브랜드);
+    history.replaceState(null,'',url.href);
+  })
 </script>
 
 <svelte:window
@@ -941,6 +953,12 @@
   }
   .app-user-select-container {
     flex-grow: 1;
+  }
+
+  select.app-user-select {
+    width: 0;
+    height: 0;
+    display: none;
   }
   .app-submit-div {
     display: flex;
