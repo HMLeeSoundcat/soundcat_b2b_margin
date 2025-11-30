@@ -705,7 +705,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr>
+          <tr style="background:#f2f2f2">
             <td>
               <div>
                 <span><b>{선택된브랜드} 브랜드 전체 수정</b> (값 입력 후 엔터)</span>
