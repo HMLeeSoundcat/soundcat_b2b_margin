@@ -191,6 +191,8 @@
 
   let 품목테이블바디: HTMLElement | undefined = $state();
 
+  let 테이블컨테이너: HTMLElement | undefined = $state();
+
   const 설정초기화값 = {
     default_margin: 0,
     default_prov: 0,
@@ -551,6 +553,37 @@
     }
   }
 
+  function 테이블스크롤(e: UIEvent) {
+    if (!테이블컨테이너) return;
+
+    const tableFullWidth = 테이블컨테이너.scrollWidth;
+    const tableClientWidth = 테이블컨테이너.clientWidth;
+    const tableFullHeight = 테이블컨테이너.scrollHeight;
+    const tableClientHeight = 테이블컨테이너.clientHeight;
+    const xScrollPos = 테이블컨테이너.scrollLeft;
+    const yScrollPos = 테이블컨테이너.scrollTop;
+
+    if (tableFullWidth != tableClientWidth) {
+      if (xScrollPos == 0) {
+        테이블컨테이너.dataset.x = 'right';
+      } else if (xScrollPos + tableClientWidth == tableFullWidth) {
+        테이블컨테이너.dataset.x = 'left';
+      } else {
+        테이블컨테이너.dataset.x = 'both';
+      }
+    }
+
+    if (tableFullHeight != tableClientHeight) {
+      if (yScrollPos == 0) {
+        테이블컨테이너.dataset.y = 'bottom';
+      } else if (yScrollPos + tableClientHeight == tableFullHeight) {
+        테이블컨테이너.dataset.y = 'top';
+      } else {
+        테이블컨테이너.dataset.y = 'both';
+      }
+    }
+  }
+
   onMount(async () => {
     const url = new URL(location.href);
     브랜드파라미터 = url.searchParams.get("brand");
@@ -681,7 +714,7 @@
     </div>
   {/if}
   {#if 선택된브랜드 && 선택된브랜드품목}
-    <div class="app-table-container">
+    <div class={["app-table-container"]} bind:this={테이블컨테이너} onscroll={테이블스크롤}>
       <table class="app-table">
         <colgroup>
           {#each Object.keys(품목테이블컬럼속성) as 컬럼명}
@@ -1046,18 +1079,58 @@
     overflow-x: auto;
     height: calc(100vh - calc(216px + 5em));
     overflow-y: auto;
+    position: relative;
+  }
+  .app-table-container::before {
+    content:"";
+    position: sticky;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    background-image: var(--x-grad), var(--y-grad);
+    pointer-events: none;
+    z-index: 9;
+    transition: .2s;
+  }
+  :global([data-x="both"]) {
+    --x-grad: var(--x-grad-start), var(--x-grad-end);
+  }
+  :global([data-x="left"]) {
+    --x-grad: var(--x-grad-start);
+  }
+  :global([data-x="right"]) {
+    --x-grad: var(--x-grad-end);
+  }
+  :global([data-y="both"]) {
+    --y-grad: var(--y-grad-start), var(--y-grad-end);
+  }
+  :global([data-y="top"]) {
+    --y-grad: var(--y-grad-start);
+  }
+  :global([data-y="bottom"]) {
+    --y-grad: var(--y-grad-end);
+  }
+  .app-section {
+    --x-grad-start: linear-gradient(90deg, white 1%, transparent 5%);
+    --x-grad-end: linear-gradient(90deg, transparent 95%, white 99%);
+    --y-grad-start: linear-gradient(180deg, transparent, transparent 5%);
+    --y-grad-end: linear-gradient(180deg, transparent 95%, white 99%);
   }
   .app-table {
     width: 100%;
     min-width: 1200px;
     border-collapse: collapse;
+    position: absolute;
+    top: 0;
+    left: 0;
   }
   .app-table thead {
     background: #eee;
     box-shadow: 0 2px 4px #0002;
     position: sticky;
     top: 0;
-    z-index: 3;
+    z-index: 10;
     text-align: center;
   }
   .app-table tr {
