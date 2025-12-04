@@ -7,67 +7,32 @@
   import { SvelteMap } from "svelte/reactivity";
   import Portal from "svelte-portal";
 
+  import * as Types from "./types";
+
   const useDev = import.meta.env.MODE === "development";
-
-  interface 개별품목타입 {
-    no_id: number;
-    brand: string;
-    PROD_CD: string;
-    product: string;
-    hidden: number;
-    stock: number;
-    soldout: number;
-    price: number;
-    default_margin: 마진타입;
-    href: string | undefined;
-  }
-
-  interface 품목목록타입 {
-    [key: string]: 개별품목타입[];
-  }
-
-  interface 마진설정값타입 {
-    default_margin: number | string | undefined;
-    default_prov: number | string | undefined;
-    discount_margin: number | string | undefined;
-    discount_price: number | string | undefined;
-    discount_qty: number | string | undefined;
-  }
-
-  interface 마진타입 extends 마진설정값타입 {
-    brand_disc_amount: number | string | undefined;
-    link_def: boolean;
-    link_disc: boolean;
-    per_user: {
-      [key: string]: 마진설정값타입;
-    };
-  }
-
-  interface 아이디목록타입 {
-    mb_no: string;
-    mb_id: string;
-    mb_nick: string;
-    mb_8: string;
-  }
-
-  interface 품목테이블컬럼속성타입 {
-    [key: string]: {
-      width: string;
-      display: boolean;
-      label: string;
-    };
-  }
 
   const 품목정렬방법타입 = { name_asc: "품목명 오름차순", name_desc: "품목명 내림차순", noid_desc: "등록 최신순", noid_asc: "등록 오래된순", price_asc: "가격 오름차순", price_desc: "가격 내림차순" } as const;
 
+  const 설정초기화값 = {
+    default_margin: 0,
+    default_prov: 0,
+    discount_qty: 0,
+    discount_margin: 0,
+    discount_price: 0,
+    brand_disc_amount: 0,
+    per_user: {},
+    link_def: false,
+    link_disc: false,
+  };
+
   let 품목정렬방법: keyof typeof 품목정렬방법타입 = $state("name_asc");
 
-  let 품목목록: 품목목록타입 = $state({});
-  let 품목목록사본: 품목목록타입 = $state({});
+  let 품목목록: Types.품목목록타입 = $state({});
+  let 품목목록사본: Types.품목목록타입 = $state({});
 
   let 브랜드: string[] | undefined = $state([]);
 
-  let 브랜드파라미터: string|undefined|null = $state();
+  let 브랜드파라미터: string | undefined | null = $state();
 
   let 상세DB데이터:
     | {
@@ -84,9 +49,9 @@
     const 정렬방향: "asc" | "desc" = 분해[1] && ["asc", "desc"].includes(분해[1]) ? (분해[1] as "asc" | "desc") : "asc";
 
     const 정렬방법 = {
-      name: (x: 개별품목타입, i: number) => ({ index: i, value: x.product.toLowerCase() }),
-      noid: (x: 개별품목타입, i: number) => ({ index: i, value: parseInt(String(x.no_id)) }),
-      price: (x: 개별품목타입, i: number) => ({ index: i, value: parseInt(String(x.price)) }),
+      name: (x: Types.개별품목타입, i: number) => ({ index: i, value: x.product.toLowerCase() }),
+      noid: (x: Types.개별품목타입, i: number) => ({ index: i, value: parseInt(String(x.no_id)) }),
+      price: (x: Types.개별품목타입, i: number) => ({ index: i, value: parseInt(String(x.price)) }),
     };
 
     let mapped = 선택된브랜드 ? 품목목록 && 품목목록[선택된브랜드].map((x, i) => 정렬방법[필드](x, i)) : undefined;
@@ -109,12 +74,19 @@
     }
   });
 
-  let 변경된행 = new SvelteMap<개별품목타입["no_id"], 개별품목타입>();
+  let 변경된행 = new SvelteMap<Types.개별품목타입["no_id"], Types.개별품목타입>();
   if (useDev) $inspect(변경된행);
 
   let 마진공급가자동계산 = $derived(선택된브랜드품목?.every(품목 => 품목.default_margin && typeof 품목.default_margin == "object" && 품목.default_margin.link_def && 품목.default_margin.link_disc));
 
-  let 아이디목록: 아이디목록타입[] | undefined = $state([]);
+  let 아이디목록: Types.아이디목록타입[] | undefined = $state([]);
+  let 아이디목록캐싱 = $derived.by(() => {
+    const obj: { [key: string]: string } = {};
+    아이디목록?.forEach(element => {
+      obj[element.mb_id] = element.mb_nick;
+    });
+    return obj;
+  });
 
   let 아이디입력상자: HTMLSelectElement | undefined = $state();
   let 아이디선택상자 = $derived.by(() => {
@@ -140,7 +112,7 @@
 
   let 선택된아이디: string[] = $state([]);
 
-  let 품목테이블컬럼속성: 품목테이블컬럼속성타입 = $derived({
+  let 품목테이블컬럼속성: Types.품목테이블컬럼속성타입 = $derived({
     no_id: { width: "0%", display: false, label: "" },
     품목명: { width: "30%", display: true, label: "품목명" },
     소비자가: { width: "10%", display: true, label: "소비자가(원)" },
@@ -164,7 +136,7 @@
     },
   });
 
-  let 브랜드일괄편집필드: Omit<마진타입, "per_user"> = $state({
+  let 브랜드일괄편집필드: Omit<Types.마진타입, "per_user"> = $state({
     default_margin: undefined,
     default_prov: undefined,
     discount_qty: undefined,
@@ -193,17 +165,10 @@
 
   let 테이블컨테이너: HTMLElement | undefined = $state();
 
-  const 설정초기화값 = {
-    default_margin: 0,
-    default_prov: 0,
-    discount_qty: 0,
-    discount_margin: 0,
-    discount_price: 0,
-    brand_disc_amount: 0,
-    per_user: {},
-    link_def: false,
-    link_disc: false,
-  };
+  let 마진설정값가져오기팝업열림 = $state(false);
+  let 마진설정값가져올아이디: string | undefined = $state();
+
+  let 마진초기화팝업작게표시 = $state(false);
 
   function 브랜드일괄편집필드리셋() {
     브랜드일괄편집필드 = {
@@ -233,10 +198,10 @@
       });
 
       if (가져오기.ok) {
-        const 결과: 품목목록타입 = await 가져오기.json();
+        const 결과: Types.품목목록타입 = await 가져오기.json();
         브랜드 = 결과 && Object.keys(결과);
         브랜드.forEach(아이템 => {
-          품목목록[아이템] = 결과[아이템].map((아이템: 개별품목타입) => {
+          품목목록[아이템] = 결과[아이템].map((아이템: Types.개별품목타입) => {
             let default_margin;
             try {
               if (typeof 아이템.default_margin == "string") {
@@ -292,7 +257,7 @@
     }
   }
 
-  function 유저별엔트리생성(품목: 개별품목타입, 아이디: string) {
+  function 유저별엔트리생성(품목: Types.개별품목타입, 아이디: string) {
     if (typeof 품목.default_margin.per_user != "object") 품목.default_margin.per_user = {};
 
     if (!품목.default_margin.per_user?.[아이디])
@@ -305,7 +270,7 @@
       };
   }
 
-  function 마진값겟터(품목: 개별품목타입 | 개별품목타입[], 유형: keyof 마진설정값타입) {
+  function 마진값겟터(품목: Types.개별품목타입 | Types.개별품목타입[], 유형: keyof Omit<Types.마진설정값타입, "brand_disc_amount">) {
     const 게팅할품목 = Array.isArray(품목) ? 품목 : [품목];
     let 반환할값;
 
@@ -324,9 +289,10 @@
     return 반환할값;
   }
 
-  function 마진값셋터(v: string | number | undefined, 품목: 개별품목타입 | 개별품목타입[], 유형: keyof 마진설정값타입) {
+  function 마진값셋터(v: string | number | undefined, 품목: Types.개별품목타입 | Types.개별품목타입[], 유형: keyof Types.마진설정값타입) {
     const 세팅할품목 = Array.isArray(품목) ? 품목 : [품목];
-    let 링크값: keyof 마진설정값타입 | undefined = undefined;
+    let 링크값: keyof Types.마진설정값타입 | undefined = undefined;
+    let 링크타겟: "link_def" | "link_disc" = "link_def";
     let 링크값가격계산여부: boolean = false;
 
     const 링크값계산 = (링크값가격계산여부: boolean, 소비자가: number, 마진: string | number | undefined, 할인가: string | number | undefined) => {
@@ -341,15 +307,19 @@
       case "default_margin":
         링크값 = "default_prov";
         링크값가격계산여부 = true;
+        링크타겟 = "link_def";
         break;
       case "default_prov":
         링크값 = "default_margin";
+        링크타겟 = "link_def";
         break;
       case "discount_margin":
         링크값 = "discount_price";
+        링크타겟 = "link_disc";
         링크값가격계산여부 = true;
         break;
       case "discount_price":
+        링크타겟 = "link_disc";
         링크값 = "discount_margin";
         break;
       case "discount_qty":
@@ -358,7 +328,7 @@
     }
 
     for (const 품목 of 세팅할품목) {
-      let 마진설정할품목들: 마진설정값타입[] = [];
+      let 마진설정할품목들: Omit<Types.마진설정값타입, "brand_disc_amount">[] = [];
 
       if (선택된아이디.length == 0) {
         마진설정할품목들.push(품목.default_margin);
@@ -370,8 +340,9 @@
       }
 
       for (const 마진설정할품목 of 마진설정할품목들) {
+        if (유형 == "brand_disc_amount") continue;
         마진설정할품목[유형] = 숫자로변환(v ?? 품목.default_margin[유형]);
-        if (품목.default_margin.link_def && 링크값) 마진설정할품목[링크값] = 링크값계산(링크값가격계산여부, 품목.price, 마진설정할품목[유형], 마진설정할품목[유형]);
+        if (품목.default_margin[링크타겟] && 링크값) 마진설정할품목[링크값] = 링크값계산(링크값가격계산여부, 품목.price, 마진설정할품목[유형], 마진설정할품목[유형]);
       }
       if (선택된아이디.length > 0) 품목.default_margin.per_user = { ...품목.default_margin.per_user };
     }
@@ -392,14 +363,14 @@
     return String(값).endsWith(".") ? 값 : Intl.NumberFormat("ko-KR").format(parseFloat(String(값)));
   }
 
-  function 브랜드값일괄편집<Target extends Exclude<keyof 마진타입, "per_user"> & Exclude<keyof 마진타입, "link_def"> & Exclude<keyof 마진타입, "link_disc">>(값: string | number, 타겟: Target) {
+  function 브랜드값일괄편집<Target extends Exclude<keyof Types.마진타입, "per_user"> & Exclude<keyof Types.마진타입, "link_def"> & Exclude<keyof Types.마진타입, "link_disc">>(값: string | number, 타겟: Target) {
     선택된브랜드품목?.forEach(품목 => {
-      (품목.default_margin as 마진타입)[타겟] = 숫자로변환(값);
+      (품목.default_margin as Types.마진타입)[타겟] = 숫자로변환(값);
       변경된행.set($state.snapshot(품목).no_id, $state.snapshot(품목));
     });
   }
 
-  async function 행업데이트(품목: 개별품목타입 | 개별품목타입[], 유형: keyof 마진설정값타입 | undefined = undefined) {
+  async function 행업데이트(품목: Types.개별품목타입 | Types.개별품목타입[], 유형: keyof Types.마진설정값타입 | undefined = undefined) {
     const 세팅할품목 = Array.isArray(품목) ? 품목 : [품목];
 
     let 유저값초기화여부 = undefined;
@@ -413,7 +384,17 @@
           confirmButtonText: "예",
           showCancelButton: true,
           cancelButtonText: "아니오",
+          showDenyButton: !마진초기화팝업작게표시,
+          denyButtonText: "10분간 작게 알림",
+          toast: 마진초기화팝업작게표시,
+          timer: 마진초기화팝업작게표시 ? 10000 : 0,
+          timerProgressBar: 마진초기화팝업작게표시,
+          position: 마진초기화팝업작게표시 ? "bottom" : "center",
+          width: "fit-content",
+          focusCancel: true,
         });
+
+        if (팝업창.isDenied) 마진초기화팝업작게표시 = true;
 
         if (!유저값초기화여부) 유저값초기화여부 = 팝업창.isConfirmed;
       }
@@ -422,7 +403,7 @@
     }
   }
 
-  function 수정여부확인(품목: 개별품목타입, 항목: keyof 마진설정값타입) {
+  function 수정여부확인(품목: Types.개별품목타입, 항목: keyof Omit<Types.마진설정값타입, "brand_disc_amount">) {
     let 반환할값 = false;
     for (const 각아이디 of 선택된아이디) {
       if (반환할값 == false && 품목?.default_margin && typeof 품목?.default_margin == "object" && 품목.default_margin.per_user?.[각아이디]?.[항목] && 품목.default_margin[항목] != 품목.default_margin.per_user?.[각아이디]?.[항목]) 반환할값 = true;
@@ -565,23 +546,62 @@
 
     if (tableFullWidth != tableClientWidth) {
       if (xScrollPos == 0) {
-        테이블컨테이너.dataset.x = 'right';
+        테이블컨테이너.setAttribute("data-x", "right");
       } else if (xScrollPos + tableClientWidth == tableFullWidth) {
-        테이블컨테이너.dataset.x = 'left';
+        테이블컨테이너.setAttribute("data-x", "left");
       } else {
-        테이블컨테이너.dataset.x = 'both';
+        테이블컨테이너.setAttribute("data-x", "both");
       }
     }
 
     if (tableFullHeight != tableClientHeight) {
       if (yScrollPos == 0) {
-        테이블컨테이너.dataset.y = 'bottom';
+        테이블컨테이너.setAttribute("data-y", "bottom");
       } else if (yScrollPos + tableClientHeight == tableFullHeight) {
-        테이블컨테이너.dataset.y = 'top';
+        테이블컨테이너.setAttribute("data-y", "top");
       } else {
-        테이블컨테이너.dataset.y = 'both';
+        테이블컨테이너.setAttribute("data-y", "both");
       }
     }
+  }
+
+  async function 마진설정값가져오기팝업(e: UIEvent) {
+    if (선택된아이디.length === 0) return;
+
+    마진설정값가져올아이디 = undefined;
+
+    const 팝업결정 = await Swal.fire({
+      html: "&nbsp;",
+      showCancelButton: true,
+      cancelButtonText: "취소(닫기)",
+      confirmButtonText: "가져오기",
+      customClass: {
+        htmlContainer: "margin_import_popup",
+      },
+      willOpen: () => {
+        마진설정값가져오기팝업열림 = true;
+      },
+      didClose: () => {
+        마진설정값가져오기팝업열림 = false;
+      },
+    });
+
+    if (팝업결정.isConfirmed && 마진설정값가져올아이디 && 선택된브랜드품목) {
+      for (const 품목 of 선택된브랜드품목) {
+        if (품목.default_margin.per_user?.[마진설정값가져올아이디]) {
+          let 넣을값 = 품목.default_margin.per_user?.[마진설정값가져올아이디];
+          for (const 각아이디 of 선택된아이디) {
+            품목.default_margin.per_user[각아이디] = structuredClone($state.snapshot(넣을값));
+          }
+        }
+        품목.default_margin.per_user = {
+          ...$state.snapshot(품목.default_margin.per_user),
+        };
+        변경된행.set(품목.no_id, 품목);
+      }
+    }
+
+    마진설정값가져올아이디 = undefined;
   }
 
   onMount(async () => {
@@ -617,12 +637,16 @@
     }
   });
 
-  $effect(()=>{
+  $effect(() => {
     if (!선택된브랜드) return;
     const url = new URL(location.href);
-    url.searchParams.set('brand',선택된브랜드);
-    history.replaceState(null,'',url.href);
-  })
+    url.searchParams.set("brand", 선택된브랜드);
+    history.replaceState(null, "", url.href);
+  });
+
+  $effect(() => {
+    if (마진초기화팝업작게표시) setTimeout(() => (마진초기화팝업작게표시 = false), 60000);
+  });
 </script>
 
 <svelte:window
@@ -641,6 +665,10 @@
         bind:this={아이디입력상자}>
       </select>
     </div>
+    <button
+      type="button"
+      class={["blue", 선택된아이디.length || "disabled"]}
+      onclick={마진설정값가져오기팝업}>마진 설정값 가져오기</button>
     <div>
       <select
         name="item_order"
@@ -714,7 +742,40 @@
     </div>
   {/if}
   {#if 선택된브랜드 && 선택된브랜드품목}
-    <div class={["app-table-container"]} bind:this={테이블컨테이너} onscroll={테이블스크롤}>
+    {#snippet brandAll(target: keyof Types.마진설정값타입, callback: (target: keyof Types.마진설정값타입, e: Event) => void)}
+      <div>
+        <input
+          type="text"
+          onchange={e => {
+            callback(target, e);
+          }}
+          bind:value={
+            () => 로케일숫자로표시(브랜드일괄편집필드[target]),
+            (v: string | number) => {
+              브랜드일괄편집필드[target] = 숫자로변환(v);
+            }
+          } />
+      </div>
+    {/snippet}
+    {#snippet eachProduct(품목: Types.개별품목타입, target: keyof Omit<Types.마진설정값타입, "brand_disc_amount">)}
+      <div>
+        <input
+          type="text"
+          onchange={() => 행업데이트(품목, target)}
+          bind:value={
+            () => 마진값겟터(품목, target),
+            (v: string | number | undefined) => {
+              마진값셋터(v, 품목, target);
+            }
+          } />
+      </div>
+    {/snippet}
+    <div
+      class={["app-table-container"]}
+      data-x="no"
+      data-y="bottom"
+      bind:this={테이블컨테이너}
+      onwheel={테이블스크롤}>
       <table class="app-table">
         <colgroup>
           {#each Object.keys(품목테이블컬럼속성) as 컬럼명}
@@ -745,61 +806,32 @@
               </div></td>
             <td></td>
             <td>
-              <div>
-                <input
-                  type="text"
-                  onchange={e => {
-                    마진값셋터(e.currentTarget.value, 선택된브랜드품목, "default_margin");
-                    행업데이트(선택된브랜드품목, "default_margin");
-                  }}
-                  bind:value={
-                    () => 로케일숫자로표시(브랜드일괄편집필드.default_margin),
-                    (v: string | number) => {
-                      브랜드일괄편집필드.default_margin = 숫자로변환(v);
-                    }
-                  } />
-              </div></td>
+              {@render brandAll("default_margin", (target, e) => {
+                if (!(e.currentTarget instanceof HTMLInputElement)) return;
+                마진값셋터(e.currentTarget.value, 선택된브랜드품목, target);
+                행업데이트(선택된브랜드품목, target);
+              })}</td>
             <td></td>
             <td>
-              <div>
-                <input
-                  type="text"
-                  onchange={e => {
-                    마진값셋터(e.currentTarget.value, 선택된브랜드품목, "discount_margin");
-                    행업데이트(선택된브랜드품목, "discount_margin");
-                  }}
-                  bind:value={
-                    () => 로케일숫자로표시(브랜드일괄편집필드.discount_margin),
-                    (v: string | number) => {
-                      브랜드일괄편집필드.discount_margin = 숫자로변환(v);
-                    }
-                  } />
-              </div></td>
+              {@render brandAll("discount_margin", (target, e) => {
+                if (!(e.currentTarget instanceof HTMLInputElement)) return;
+                마진값셋터(e.currentTarget.value, 선택된브랜드품목, target);
+                행업데이트(선택된브랜드품목, target);
+              })}
+            </td>
             <td></td>
             <td>
-              <div>
-                <input
-                  type="text"
-                  onchange={e => 브랜드값일괄편집(e.currentTarget.value, "discount_qty")}
-                  bind:value={
-                    () => 로케일숫자로표시(브랜드일괄편집필드.discount_qty),
-                    (v: string | number) => {
-                      브랜드일괄편집필드.discount_qty = 숫자로변환(v);
-                    }
-                  } />
-              </div></td>
+              {@render brandAll("discount_qty", (target, e) => {
+                if (!(e.currentTarget instanceof HTMLInputElement)) return;
+                브랜드값일괄편집(e.currentTarget.value, target);
+              })}
+            </td>
             <td>
-              <div>
-                <input
-                  type="text"
-                  onchange={e => 브랜드값일괄편집(e.currentTarget.value, "brand_disc_amount")}
-                  bind:value={
-                    () => 로케일숫자로표시(브랜드일괄편집필드.brand_disc_amount),
-                    (v: string | number) => {
-                      브랜드일괄편집필드.brand_disc_amount = 숫자로변환(v);
-                    }
-                  } />
-              </div></td>
+              {@render brandAll("brand_disc_amount", (target, e) => {
+                if (!(e.currentTarget instanceof HTMLInputElement)) return;
+                브랜드값일괄편집(e.currentTarget.value, target);
+              })}
+            </td>
           </tr>
         </tbody>
         {#if 선택된브랜드품목.length}
@@ -817,24 +849,22 @@
                           href={품목.href}>(상세DB 보기)</a>
                       {/if}
                     </span>
-                  </div></td>
+                    {#if Object.keys(품목.default_margin.per_user).length > 0}
+                      <span
+                        class="hasperuser"
+                        data-peruser="해당 품목은 업체 별 마진값이 설정되어 있습니다.&#13;설정된 업체: {Object.keys(품목.default_margin.per_user)
+                          .map(x => 아이디목록캐싱[x])
+                          .join(', ')}"><i class="fas fa-exclamation-circle"></i></span>
+                    {/if}
+                  </div>
+                </td>
                 <td>
                   <div style="text-align: center;">
                     <span>{Intl.NumberFormat("ko-KR").format(품목.price)}</span>
                   </div></td>
                 {#if typeof 품목.default_margin == "object"}
                   <td class:peruser={수정여부확인(품목, "default_margin")}>
-                    <div>
-                      <input
-                        type="text"
-                        onchange={() => 행업데이트(품목, "default_margin")}
-                        bind:value={
-                          () => 마진값겟터(품목, "default_margin"),
-                          (v: string | number | undefined) => {
-                            마진값셋터(v, 품목, "default_margin");
-                          }
-                        } />
-                    </div>
+                    {@render eachProduct(품목, "default_margin")}
                     <button
                       class="link"
                       tabindex="-1"
@@ -848,29 +878,10 @@
                     </button>
                   </td>
                   <td class:peruser={수정여부확인(품목, "default_prov")}>
-                    <div>
-                      <input
-                        type="text"
-                        onchange={() => 행업데이트(품목, "default_prov")}
-                        bind:value={
-                          () => 마진값겟터(품목, "default_prov"),
-                          (v: string | number | undefined) => {
-                            마진값셋터(v, 품목, "default_prov");
-                          }
-                        } />
-                    </div></td>
+                    {@render eachProduct(품목, "default_prov")}
+                  </td>
                   <td class:peruser={수정여부확인(품목, "discount_margin")}>
-                    <div>
-                      <input
-                        type="text"
-                        onchange={() => 행업데이트(품목, "discount_margin")}
-                        bind:value={
-                          () => 마진값겟터(품목, "discount_margin"),
-                          (v: string | number | undefined) => {
-                            마진값셋터(v, 품목, "discount_margin");
-                          }
-                        } />
-                    </div>
+                    {@render eachProduct(품목, "discount_margin")}
                     <button
                       class="link"
                       tabindex="-1"
@@ -883,39 +894,17 @@
                       <b>할인마진↔︎공급가 자동계산</b>
                     </button>
                   </td>
-                  <td class:peruser={수정여부확인(품목, "discount_price")}>
-                    <div>
-                      <input
-                        type="text"
-                        onchange={() => 행업데이트(품목, "discount_price")}
-                        bind:value={
-                          () => 마진값겟터(품목, "discount_price"),
-                          (v: string | number | undefined) => {
-                            마진값셋터(v, 품목, "discount_price");
-                          }
-                        } />
-                    </div></td>
-                  <td class:peruser={수정여부확인(품목, "discount_qty")}>
-                    <div>
-                      <input
-                        type="text"
-                        onchange={() => 행업데이트(품목, "discount_qty")}
-                        bind:value={
-                          () => 마진값겟터(품목, "discount_qty"),
-                          (v: string | number | undefined) => {
-                            마진값셋터(v, 품목, "discount_qty");
-                          }
-                        } />
-                    </div></td>
+                  <td class:peruser={수정여부확인(품목, "discount_price")}> {@render eachProduct(품목, "discount_price")}</td>
+                  <td class:peruser={수정여부확인(품목, "discount_qty")}> {@render eachProduct(품목, "discount_qty")}</td>
                   <td>
                     <div>
                       <input
                         type="text"
                         onchange={() => 행업데이트(품목)}
                         bind:value={
-                          () => 로케일숫자로표시((품목.default_margin as 마진타입).brand_disc_amount),
+                          () => 로케일숫자로표시((품목.default_margin as Types.마진타입).brand_disc_amount),
                           (v: string | number | undefined) => {
-                            (품목.default_margin as 마진타입).brand_disc_amount = 숫자로변환(v);
+                            (품목.default_margin as Types.마진타입).brand_disc_amount = 숫자로변환(v);
                           }
                         } />
                     </div></td>
@@ -942,6 +931,36 @@
           </code>
         </div>
       </details>
+    </div>
+  </Portal>
+{/if}
+{#if 마진설정값가져오기팝업열림}
+  <Portal target=".margin_import_popup">
+    <div>
+      <p>마진 설정값을 가져올 아이디를 선택하세요:</p>
+      <p>
+        <input
+          type="text"
+          bind:value={마진설정값가져올아이디}
+          {@attach node => {
+            const selectbox = new TomSelect(node, {
+              valueField: "mb_id",
+              labelField: "mb_nick",
+              searchField: ["mb_id", "mb_nick"],
+              options: 아이디목록,
+              maxItems: 1,
+              closeAfterSelect: true,
+              dropdownParent: "body",
+              refreshThrottle: 0,
+              placeholder: "아이디 선택...",
+            });
+            return () => {
+              selectbox.destroy();
+            };
+          }} />
+      </p>
+      <hr />
+      <p>선택된 아이디 <code>{마진설정값가져올아이디}</code>에서 마진 설정값을<br /><code>{선택된아이디.join(", ")}</code>로 가져옵니다.</p>
     </div>
   </Portal>
 {/if}
@@ -1046,7 +1065,7 @@
   .app-checkbox-label:has(input[type="checkbox"]:active:checked) i::after {
     background: rgb(16, 99, 189);
   }
-  .app-submit-div button {
+  .app-toolbar button {
     border: none;
     border-radius: 5px;
     font-size: 1em;
@@ -1054,23 +1073,27 @@
     background: #eee;
     box-shadow: 0 2px 4px #0003;
   }
-  .app-submit-div :is(button:hover, button:focus) {
+  .app-toolbar :is(button:hover, button:focus) {
     filter: brightness(1.1);
   }
-  .app-submit-div button:active {
+  .app-toolbar button:active {
     filter: brightness(1);
     transform: translateY(1px);
   }
-  .app-submit-div button.disabled {
+  .app-toolbar button.disabled {
     opacity: 0.5;
     cursor: not-allowed;
     pointer-events: none;
   }
-  .app-submit-div button.cancel {
+  .app-toolbar button.blue {
+    background: rgb(10, 127, 251);
+    color: white;
+  }
+  .app-toolbar button.cancel {
     background: rgb(179, 34, 34);
     color: white;
   }
-  .app-submit-div button.submit {
+  .app-toolbar button.submit {
     background: rgb(20, 185, 20);
     color: white;
   }
@@ -1082,16 +1105,17 @@
     position: relative;
   }
   .app-table-container::before {
-    content:"";
+    content: "";
     position: sticky;
-    top: 0; left: 0;
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
     display: block;
     background-image: var(--x-grad), var(--y-grad);
     pointer-events: none;
     z-index: 9;
-    transition: .2s;
+    transition: 0.2s;
   }
   :global([data-x="both"]) {
     --x-grad: var(--x-grad-start), var(--x-grad-end);
@@ -1111,11 +1135,17 @@
   :global([data-y="bottom"]) {
     --y-grad: var(--y-grad-end);
   }
+  :global([data-x="no"]) {
+    --x-grad: linear-gradient(90deg, transparent, transparent);
+  }
+  :global([data-y="no"]) {
+    --y-grad: linear-gradient(180deg, transparent, transparent);
+  }
   .app-section {
-    --x-grad-start: linear-gradient(90deg, white 1%, transparent 5%);
-    --x-grad-end: linear-gradient(90deg, transparent 95%, white 99%);
+    --x-grad-start: linear-gradient(90deg, white 0%, transparent 5%);
+    --x-grad-end: linear-gradient(90deg, transparent 95%, white 100%);
     --y-grad-start: linear-gradient(180deg, transparent, transparent 5%);
-    --y-grad-end: linear-gradient(180deg, transparent 95%, white 99%);
+    --y-grad-end: linear-gradient(180deg, transparent 95%, white 100%);
   }
   .app-table {
     width: 100%;
@@ -1130,7 +1160,7 @@
     box-shadow: 0 2px 4px #0002;
     position: sticky;
     top: 0;
-    z-index: 10;
+    z-index: 9;
     text-align: center;
   }
   .app-table tr {
@@ -1138,6 +1168,7 @@
   }
   .app-table tr.hidden .product_cell {
     color: #0005;
+    position: relative;
   }
   .app-table tr.hidden .product_cell span::after {
     content: " (숨겨짐)";
@@ -1287,6 +1318,41 @@
   }
   .download_db:active {
     color: black;
+  }
+  .hasperuser {
+    position: absolute;
+    top: 50%;
+    right: 1em;
+    transform: translateY(-50%);
+    color: #f006;
+    z-index: 5;
+    padding: 0.2em;
+  }
+  .hasperuser::after {
+    content: attr(data-peruser);
+    position: absolute;
+    top: 50%;
+    left: 1.5rem;
+    color: white;
+    font-size: 0.8em;
+    white-space: pre-wrap;
+    background: #000a;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    border: 2px solid white;
+    transform: translateY(-50%);
+    box-shadow: 0 4px 8px #0003;
+    opacity: 0;
+    min-width: 300px;
+    transition: 0.1s;
+    pointer-events: none;
+  }
+  .hasperuser:hover::after {
+    opacity: 1;
+    pointer-events: unset;
+  }
+  :global(.ts-dropdown) {
+    z-index: 99999;
   }
   @media screen and (max-width: 529px) {
     .app-table-container {

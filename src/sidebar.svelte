@@ -54,7 +54,7 @@
   .app-sidebars {
     position: fixed;
     top: 0;
-    left: calc(min(200px, 80vw) * -1);
+    left: calc(min(250px, 80vw) * -1);
     height: 100vh;
     display: flex;
     align-items: center;
@@ -69,7 +69,7 @@
   }
   aside {
     display: block;
-    width: min(200px, 80vw);
+    width: min(250px, 80vw);
     height: 100vh;
     border-right: 1px solid #ddd;
     padding: 0.5em;
