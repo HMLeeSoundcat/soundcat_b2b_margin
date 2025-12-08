@@ -1,3 +1,393 @@
-* {
+:global(*) {
   box-sizing: border-box;
+}
+
+.app-section {
+  position: relative;
+}
+.app-section::after {
+  content: "";
+  opacity: 0;
+  color: transparent;
+  transition: color 0.2s, opacity 0.2s;
+}
+.app-section.submitting::after {
+  content: "적용중입니다...";
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  background: #fffa;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: black;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5em;
+  opacity: 1;
+  z-index: 9999;
+}
+.app-toolbar {
+  display: flex;
+  gap: 1em;
+  margin-top: 1em;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.app-user-select-container {
+  flex-grow: 1;
+}
+
+select.app-user-select {
+  width: 0;
+  height: 0;
+  display: none;
+}
+.app-submit-div {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+.app-checkbox-label {
+  display: flex;
+  align-items: center;
+  position: relative;
+  gap: 0.2em;
+}
+.app-checkbox-label input[type="checkbox"] {
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  margin: 0;
+}
+.app-checkbox-label:has(input[type="checkbox"]) i {
+  position: relative;
+  display: flex;
+  width: calc(1em + 4px);
+  height: calc(1em + 4px);
+  border-radius: 4px;
+  border: 2px solid #ddd;
+  align-items: center;
+  justify-content: center;
+}
+.app-checkbox-label:has(input[type="checkbox"]:checked) i::after {
+  content: "";
+  display: block;
+  width: calc(1em - 2px);
+  height: calc(1em - 2px);
+  border-radius: 3px;
+  background: rgb(10, 127, 251);
+}
+.app-checkbox-label:has(input[type="checkbox"]):hover i {
+  border-color: #bbb;
+}
+.app-checkbox-label:has(input[type="checkbox"]:focus) i {
+  border: 2px solid rgb(10, 127, 251) !important;
+}
+.app-checkbox-label:has(input[type="checkbox"]:active) i {
+  background: #eee;
+}
+.app-checkbox-label:has(input[type="checkbox"]:checked) i {
+  border: 2px solid rgb(10, 127, 251);
+}
+.app-checkbox-label:has(input[type="checkbox"]:checked):hover i::after {
+  background: rgb(95, 164, 237) !important;
+}
+.app-checkbox-label:has(input[type="checkbox"]:active:checked) i::after {
+  background: rgb(16, 99, 189);
+}
+.app-toolbar button {
+  border: none;
+  border-radius: 5px;
+  font-size: 1em;
+  padding: 0.5em 1em;
+  background: #eee;
+  box-shadow: 0 2px 4px #0003;
+}
+.app-toolbar :is(button:hover, button:focus) {
+  filter: brightness(1.1);
+}
+.app-toolbar button:active {
+  filter: brightness(1);
+  transform: translateY(1px);
+}
+.app-toolbar button.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.app-toolbar button.blue {
+  background: rgb(10, 127, 251);
+  color: white;
+}
+.app-toolbar button.cancel {
+  background: rgb(179, 34, 34);
+  color: white;
+}
+.app-toolbar button.submit {
+  background: rgb(20, 185, 20);
+  color: white;
+}
+.app-table-container {
+  margin-top: 1em;
+  overflow-x: auto;
+  height: calc(100vh - calc(216px + 5em));
+  overflow-y: auto;
+  position: relative;
+}
+.app-table-container::before {
+  content: "";
+  position: sticky;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  background-image: var(--x-grad), var(--y-grad);
+  pointer-events: none;
+  z-index: 9;
+  transition: 0.2s;
+}
+:global([data-x="both"]) {
+  --x-grad: var(--x-grad-start), var(--x-grad-end);
+}
+:global([data-x="left"]) {
+  --x-grad: var(--x-grad-start);
+}
+:global([data-x="right"]) {
+  --x-grad: var(--x-grad-end);
+}
+:global([data-y="both"]) {
+  --y-grad: var(--y-grad-start), var(--y-grad-end);
+}
+:global([data-y="top"]) {
+  --y-grad: var(--y-grad-start);
+}
+:global([data-y="bottom"]) {
+  --y-grad: var(--y-grad-end);
+}
+:global([data-x="no"]) {
+  --x-grad: linear-gradient(90deg, transparent, transparent);
+}
+:global([data-y="no"]) {
+  --y-grad: linear-gradient(180deg, transparent, transparent);
+}
+.app-section {
+  --x-grad-start: linear-gradient(90deg, white 0%, transparent 5%);
+  --x-grad-end: linear-gradient(90deg, transparent 95%, white 100%);
+  --y-grad-start: linear-gradient(180deg, transparent, transparent 5%);
+  --y-grad-end: linear-gradient(180deg, transparent 95%, white 100%);
+}
+.app-table {
+  width: 100%;
+  min-width: 1200px;
+  border-collapse: collapse;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.app-table thead {
+  background: #eee;
+  box-shadow: 0 2px 4px #0002;
+  position: sticky;
+  top: 0;
+  z-index: 9;
+  text-align: center;
+}
+.app-table tr {
+  border-bottom: 1px solid #ddd;
+}
+.app-table tr.hidden .product_cell {
+  color: #0005;
+  position: relative;
+}
+.app-table tr.hidden .product_cell span::after {
+  content: " (숨겨짐)";
+}
+.app-table :is(th, td) {
+  height: 1em;
+  position: relative;
+}
+.app-table :is(th, td) div {
+  padding: 0.5em;
+}
+.app-table :is(th, td) span {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+.app-table td.peruser {
+  background: rgba(255, 255, 0, 0.2) !important;
+}
+.app-table button.link {
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  color: #666;
+  font-size: 0.8em;
+  padding: 0.5rem;
+  box-shadow: 0 2px 4px #0003;
+  z-index: 2;
+  opacity: 1;
+  border: none;
+  background: white;
+  margin: 0;
+  width: 2rem;
+  height: 2rem;
+  cursor: pointer;
+}
+.app-table button.link b {
+  display: block;
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 5px;
+  padding: 0.5em;
+  color: white;
+  background: #0009;
+  width: max-content;
+  pointer-events: none;
+  opacity: 0;
+  transition: 0.2s;
+}
+.app-table button.link:hover {
+  filter: brightness(0.9);
+}
+.app-table button.link:hover b {
+  opacity: 1;
+}
+.app-table button.link:active {
+  filter: brightness(0.9);
+  transform: translate(-50%, calc(-50% + 1px));
+}
+.app-table button.link i.fa-unlink {
+  opacity: 0.5;
+}
+.app-table td input[type="text"] {
+  width: 100%;
+  display: block;
+  font-size: 1em;
+  padding: 0.5em;
+  border: none;
+  outline: none;
+  border-bottom: 2px solid #eee;
+  background-color: transparent;
+  transition: border 0.2s, background-color 0.2s;
+  text-align: center;
+}
+.app-table td input[type="text"]:hover {
+  border-color: #ccc;
+  background-color: #f4f4f4;
+}
+.app-table td input[type="text"]:focus {
+  border-color: rgb(10, 127, 251);
+  background: white;
+  transition: border 0s;
+}
+.app-table tr:has(:focus) {
+  background: #0001;
+}
+.loading,
+.failed {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  flex-direction: column;
+  margin-top: 2em;
+  gap: 1em;
+}
+.retry-btn {
+  border: none;
+  border-radius: 5px;
+  font-size: 1em;
+  padding: 0.5em 1em;
+  background: rgb(20, 185, 20);
+  box-shadow: 0 2px 4px #0003;
+  color: white;
+}
+.retry-btn:hover,
+.retry-btn:focus {
+  filter: brightness(1.1);
+}
+.retry-btn:active {
+  filter: brightness(1);
+  transform: translateY(1px);
+}
+.nobrand {
+  width: 100%;
+  height: 600px;
+  background: #eee;
+  border-radius: 1em;
+  margin-top: 1em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2em;
+  color: #666;
+}
+#item_order {
+  display: block;
+  padding: 0.5em 1em;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 15px;
+}
+.download_db {
+  font-size: 0.8em;
+  color: black;
+  text-decoration: underline;
+}
+.download_db:hover {
+  color: #0d6efd;
+}
+.download_db:active {
+  color: black;
+}
+.hasperuser {
+  position: absolute;
+  top: 50%;
+  right: 1em;
+  transform: translateY(-50%);
+  color: #f006;
+  z-index: 5;
+  padding: 0.2em;
+}
+.hasperuser::after {
+  content: attr(data-peruser);
+  position: absolute;
+  top: 50%;
+  left: 1.5rem;
+  color: white;
+  font-size: 0.8em;
+  white-space: pre-wrap;
+  background: #000a;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  border: 2px solid white;
+  transform: translateY(-50%);
+  box-shadow: 0 4px 8px #0003;
+  opacity: 0;
+  min-width: 300px;
+  transition: 0.1s;
+  pointer-events: none;
+}
+.hasperuser:hover::after {
+  opacity: 1;
+  pointer-events: unset;
+}
+:global(.ts-dropdown) {
+  z-index: 99999;
+}
+@media screen and (max-width: 529px) {
+  .app-table-container {
+    height: calc(100vh - calc(160px + 7em));
+  }
 }
