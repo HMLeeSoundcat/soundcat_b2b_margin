@@ -41,6 +41,8 @@
     | undefined = $state();
 
   let 선택된브랜드: string | undefined = $state();
+
+  /** 선택된브랜드의 값이 변경되면, 1. 선택된 품목정렬방법으로, 2. 품목목록으로부터 선택된브랜드 값을 뽑아 3. 정렬하고 배열에 담는다. */
   let 선택된브랜드품목 = $derived.by(() => {
     if (!선택된브랜드) return;
 
@@ -80,6 +82,8 @@
   let 마진공급가자동계산 = $derived(선택된브랜드품목?.every(품목 => 품목.default_margin && typeof 품목.default_margin == "object" && 품목.default_margin.link_def && 품목.default_margin.link_disc));
 
   let 아이디목록: Types.아이디목록타입[] | undefined = $state([]);
+
+  /** 마진 설정값 가져오기를 위한 변수로, 아이디-닉네임 쌍으로 된 객체로 변환 생성해준다. */
   let 아이디목록캐싱 = $derived.by(() => {
     const obj: { [key: string]: string } = {};
     아이디목록?.forEach(element => {
@@ -89,6 +93,8 @@
   });
 
   let 아이디입력상자: HTMLSelectElement | undefined = $state();
+
+  /** 아이디입력상자가 DOM에 있고, 아이디목록이 로드 완료되면 TomSelect로 셀렉터를 변환시켜준다. */
   let 아이디선택상자 = $derived.by(() => {
     if (!(아이디입력상자 && 아이디목록 && 아이디목록.length > 0)) return;
     return new TomSelect(아이디입력상자, {
@@ -112,6 +118,7 @@
 
   let 선택된아이디: string[] = $state([]);
 
+  /** 테이블 너비를 한번에 관리하고 테이블 헤드 라벨을 여기서 수정할 수 있다. 컬럼 표시 여부도 설정할 수 있다. */
   let 품목테이블컬럼속성: Types.품목테이블컬럼속성타입 = $derived({
     no_id: { width: "0%", display: false, label: "" },
     품목명: { width: "30%", display: true, label: "품목명" },
