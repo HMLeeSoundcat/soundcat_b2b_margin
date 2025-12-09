@@ -257,6 +257,11 @@
     }
   }
 
+  /**
+   * 유저 별 특별 공급마진 객체를 확인하고 없으면 생성해준다.
+   * @param 품목 개별 품목 행
+   * @param 아이디 아이디 값
+   */
   function 유저별엔트리생성(품목: Types.개별품목타입, 아이디: string) {
     if (typeof 품목.default_margin.per_user != "object") 품목.default_margin.per_user = {};
 
@@ -270,11 +275,16 @@
       };
   }
 
+  /**
+   * 품목 배열로부터 현재 입력중인 필드에 값을 가져오고 포맷팅해서 보여준다.
+   * @param 품목 개별 품목 행 (단일 혹은 전체)
+   * @param 유형 현재 입력중인 필드명
+   */
   function 마진값겟터(품목: Types.개별품목타입 | Types.개별품목타입[], 유형: keyof Omit<Types.마진설정값타입, "brand_disc_amount">) {
-    const 게팅할품목 = Array.isArray(품목) ? 품목 : [품목];
+    const 가져올품목 = Array.isArray(품목) ? 품목 : [품목];
     let 반환할값;
 
-    for (품목 of 게팅할품목) {
+    for (품목 of 가져올품목) {
       if (선택된아이디.length == 0) {
         반환할값 = 로케일숫자로표시(품목.default_margin[유형]);
       } else {
@@ -289,12 +299,25 @@
     return 반환할값;
   }
 
+  /**
+   * 필드에 입력된 값을 적절한 형태(숫자, 문자열)로 안전하게 가공하고 품목 배열에 집어넣는다.
+   * @param v 입력된 값
+   * @param 품목 개별 품목 행 (단일 혹은 전체)
+   * @param 유형 현재 입력중인 필드명
+   */
   function 마진값셋터(v: string | number | undefined, 품목: Types.개별품목타입 | Types.개별품목타입[], 유형: keyof Types.마진설정값타입) {
     const 세팅할품목 = Array.isArray(품목) ? 품목 : [품목];
     let 링크값: keyof Types.마진설정값타입 | undefined = undefined;
     let 링크타겟: "link_def" | "link_disc" = "link_def";
     let 링크값가격계산여부: boolean = false;
 
+    /**
+     * 현재 입력중인 필드에 대응하는 값을 자동으로 입력해주는 함수. 마진이면 공급가, 공급가면 마진.
+     * @param 링크값가격계산여부
+     * @param 소비자가
+     * @param 마진
+     * @param 할인가
+     */
     const 링크값계산 = (링크값가격계산여부: boolean, 소비자가: number, 마진: string | number | undefined, 할인가: string | number | undefined) => {
       if (링크값가격계산여부) {
         return parseFloat(String(소비자가)) * ((100 - parseFloat(String(숫자로변환(v ?? 마진)))) / 100);
@@ -348,6 +371,10 @@
     }
   }
 
+  /**
+   * 어떤 값이든 숫자로 반환해준다. 숫자로 반환할 수 없는 값이 들어오면 NaN이 반환된다.
+   * @param 값
+   */
   function 숫자로변환(값: string | number | undefined) {
     if (!값) return 0;
     const 반환할값 =
@@ -358,11 +385,20 @@
     return (반환할값.match(/\./g) || []).length == 1 && 반환할값.endsWith(".") ? 반환할값 : 파싱한값;
   }
 
+  /**
+   * 숫자에 천단위 구분점(,)을 찍어 반환한다.
+   * @param 값 숫자값
+   */
   function 로케일숫자로표시(값: string | number | undefined) {
     if (!값) return 0;
     return String(값).endsWith(".") ? 값 : Intl.NumberFormat("ko-KR").format(parseFloat(String(값)));
   }
 
+  /**
+   * 브랜드 값을 일괄 편집하는 필드에서 값을 입력하고 변경하면 해당 브랜드의 품목의 각 필드 값을 입력한 값으로 넣어준다.
+   * @param 값
+   * @param 타겟 어떤 필드에 들어가야 하는지 정의한다. boolean 타입과 object 타입에는 들어갈 수 없도록 타입 적용.
+   */
   function 브랜드값일괄편집<Target extends Exclude<keyof Types.마진타입, "per_user"> & Exclude<keyof Types.마진타입, "link_def"> & Exclude<keyof Types.마진타입, "link_disc">>(값: string | number, 타겟: Target) {
     선택된브랜드품목?.forEach(품목 => {
       (품목.default_margin as Types.마진타입)[타겟] = 숫자로변환(값);
@@ -370,6 +406,11 @@
     });
   }
 
+  /**
+   * 값을 변경하면 업데이트가 되어야 하는 행으로 대기 배열(변경된행)에 집어넣어 준다.
+   * @param 품목 개별 품목
+   * @param 유형 편집된 필드
+   */
   async function 행업데이트(품목: Types.개별품목타입 | Types.개별품목타입[], 유형: keyof Types.마진설정값타입 | undefined = undefined) {
     const 세팅할품목 = Array.isArray(품목) ? 품목 : [품목];
 
@@ -403,15 +444,21 @@
     }
   }
 
-  function 수정여부확인(품목: Types.개별품목타입, 항목: keyof Omit<Types.마진설정값타입, "brand_disc_amount">) {
+  /**
+   * 각 아이디 별로 특별 마진 값이 들어있는지 여부를 출력한다.
+   * @param 품목
+   * @param 유형
+   */
+  function 수정여부확인(품목: Types.개별품목타입, 유형: keyof Omit<Types.마진설정값타입, "brand_disc_amount">) {
     let 반환할값 = false;
     for (const 각아이디 of 선택된아이디) {
-      if (반환할값 == false && 품목?.default_margin && typeof 품목?.default_margin == "object" && 품목.default_margin.per_user?.[각아이디]?.[항목] && 품목.default_margin[항목] != 품목.default_margin.per_user?.[각아이디]?.[항목]) 반환할값 = true;
+      if (반환할값 == false && 품목?.default_margin && typeof 품목?.default_margin == "object" && 품목.default_margin.per_user?.[각아이디]?.[유형] && 품목.default_margin[유형] != 품목.default_margin.per_user?.[각아이디]?.[유형]) 반환할값 = true;
     }
 
     return 반환할값;
   }
 
+  /** 서버에 변경된행 값을 전달한다. */
   async function 적용() {
     적용중여부 = true;
     try {
@@ -459,6 +506,7 @@
     }
   }
 
+  /** 상세DB 다운로드 게시판에서 품목에 해당하는 상세DB가 있는지 확인한다. */
   async function 상세DB가져오기() {
     if (!상세DB데이터) 상세DB데이터 = {};
     let page = 1;
@@ -505,6 +553,7 @@
     }
   }
 
+  /** 테이블에서 상하 화살표키를 누르면 필드가 선택되게끔 해주는 함수 */
   const 테이블셀상하이동 = async (e: KeyboardEvent) => {
     if (품목테이블바디 && (e.target as HTMLElement)?.nodeName == "INPUT") {
       const targetCell = (e.target as HTMLElement)?.closest("td");
@@ -528,12 +577,14 @@
     }
   };
 
+  /** 입력 필드에서 마우스 클릭 후 떼면 클릭한 입력 요소의 값이 전체 선택되도록 */
   function 포인터업(e: PointerEvent) {
     if ((e.target as HTMLElement).nodeName == "INPUT") {
       (e.target as HTMLInputElement)?.select();
     }
   }
 
+  /** 테이블에서 스크롤 시 마스킹을 적용한다. */
   function 테이블스크롤(e: UIEvent) {
     if (!테이블컨테이너) return;
 
@@ -565,6 +616,7 @@
     }
   }
 
+  /** 마진 설정 값 가져오기 버튼을 누르면 어떤 아이디로부터 마진 설정 값을 가져올지 선택하는 팝업을 띄운다. */
   async function 마진설정값가져오기팝업(e: UIEvent) {
     if (선택된아이디.length === 0) return;
 
@@ -612,23 +664,29 @@
     await 아이디가져오기();
   });
 
+  /** 아이디목록이 업데이트되면 아이디선택상자 TomSelect에 옵션을 추가한다. */
   $effect(() => {
     if (아이디선택상자 && 아이디목록 && 아이디목록.length > 0) {
       아이디선택상자.addOptions(아이디목록);
     }
   });
 
+  /** 선택된 브랜드가 변경되면 브랜드 일괄 편집의 각 필드를 리셋한다. */
   $effect(() => {
     if (선택된브랜드) 브랜드일괄편집필드리셋();
   });
+
+  /** 선택된 아이디가 변경되어도 리셋한다. */
   $effect(() => {
     if (선택된아이디) 브랜드일괄편집필드리셋();
   });
 
+  /** 변경된행 배열의 개수가 1개 이상이면 내용변경여부를 true로 아니면 false로 반환한다. */
   $effect(() => {
     내용변경여부 = 변경된행.size > 0 ? true : false;
   });
 
+  /** 상세DB데이터의 내용이 변경 또는 추가되면 품목목록에서 각 품목의 href 키에 상세DB 게시글 주소를 저장한다.*/
   $effect(() => {
     if (품목목록 && 상세DB데이터) {
       for (const 브랜드항목 of Object.entries(품목목록)) {
@@ -637,6 +695,7 @@
     }
   });
 
+  /** 선택된브랜드가 없으면 GET 파라미터로부터 선택될 브랜드를 가져온다. (초기화 용) */
   $effect(() => {
     if (!선택된브랜드) return;
     const url = new URL(location.href);
@@ -644,6 +703,7 @@
     history.replaceState(null, "", url.href);
   });
 
+  /** 마진을 초기화하겠냐는 팝업은 소비자가를 수정할 때 아이디 별 입력 값이 있으면 항상 표시되는데, 작게 표시를 누르면 작게 표시한다. (1분간) */
   $effect(() => {
     if (마진초기화팝업작게표시) setTimeout(() => (마진초기화팝업작게표시 = false), 60000);
   });
