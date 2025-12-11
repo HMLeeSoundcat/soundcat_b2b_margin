@@ -19,6 +19,7 @@
     "vite": "^7.2.2"
   },
   "dependencies": {
+    "lz-string": "^1.5.0",
     "svelte-portal": "^2.2.1",
     "sweetalert2": "^11.26.3",
     "tom-select": "^2.4.3"

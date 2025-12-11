@@ -8,6 +8,7 @@
   import Portal from "svelte-portal";
 
   import * as Types from "./types";
+  import BackupRestore from "./Backup_Restore.svelte";
 
   const useDev = import.meta.env.MODE === "development";
 
@@ -229,6 +230,8 @@
         });
         품목목록사본 = structuredClone($state.snapshot(품목목록));
         if (브랜드파라미터) 선택된브랜드 = 브랜드파라미터;
+
+        console.log($state.snapshot(품목목록));
       } else {
         throw new Error("서버 접속 실패." + JSON.stringify(가져오기));
       }
@@ -736,6 +739,11 @@
       type="button"
       class={["blue", 선택된아이디.length || "disabled"]}
       onclick={마진설정값가져오기팝업}>마진 설정값 가져오기</button>
+    <div></div>
+    <div></div>
+    <BackupRestore
+      bind:품목목록
+      {행업데이트} />
     <div>
       <select
         name="item_order"
@@ -775,7 +783,7 @@
           변경된행.clear();
           품목목록 = structuredClone($state.snapshot(품목목록사본));
           브랜드일괄편집필드리셋();
-        }}><i class="fas fa-redo"></i> 변경 취소</button>
+        }}><i class="fas fa-undo"></i> 변경 취소</button>
       <button
         type="button"
         class={["submit", 내용변경여부 || "disabled"]}
