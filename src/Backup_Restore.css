@@ -21,5 +21,88 @@
 }
 
 .restore {
-  background: orange;
+  background: rgb(255, 132, 0);
+}
+
+.app_radio input {
+  width: 0;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.app_radio {
+  display: inline-flex;
+  gap: 0.5em;
+  align-items: center;
+  justify-content: center;
+}
+
+.app_radio i {
+  width: 1em;
+  height: 1em;
+  border-radius: 999px;
+  outline: 2px solid #ccc;
+  transform: translateY(1px);
+  position: relative;
+}
+
+.app_radio:hover i {
+  outline-color: #aaa;
+}
+
+.app_radio:has(input:active) i {
+  outline-color: #888;
+  background: #eee;
+}
+
+.app_radio:has(input:checked) i::after {
+  content: "";
+  position: absolute;
+  width: calc(1em - 2px);
+  height: calc(1em - 2px);
+  background: royalblue;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  display: block;
+}
+
+.app_radio:has(input:focus) i {
+  outline-color: royalblue;
+}
+
+input[type="text"] {
+  font-size: 1em;
+  padding: 0.5em;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  box-shadow: 0 2px 2px #0004;
+  width: 100%;
+  margin-top: 1em;
+  text-align: center;
+}
+
+.file {
+  display: none;
+}
+
+.filednd {
+  display: flex;
+  width: 100%;
+  height: 4em;
+  padding: 1em;
+  border-radius: 1em;
+  background: #eee;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-top: 1em;
+}
+
+.filednd.nofile::before {
+  content: "여기를 클릭해 업로드 할 파일을\A선택하거나 끌어다 놓습니다.";
+  white-space: pre-wrap;
+  color: #333;
 }
