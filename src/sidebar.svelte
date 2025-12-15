@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { onMount } from "svelte";
+
   let { 브랜드, 선택된브랜드 = $bindable(), 품목목록가져오기 } = $props();
   let 사이드바: HTMLElement | undefined = $state();
 
@@ -6,6 +8,10 @@
 
   $effect(() => {
     if (선택된브랜드) 사이드바열림 = false;
+  });
+
+  onMount(() => {
+    사이드바열림 = true;
   });
 </script>
 
