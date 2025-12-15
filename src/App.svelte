@@ -721,7 +721,9 @@
 
 <svelte:window
   onkeydown={테이블셀상하이동}
-  onpointerup={포인터업} />
+  onpointerup={포인터업}
+  on:dragover={e => e.preventDefault()}
+  on:drop={e => e.preventDefault()} />
 <section class={["app-section", 적용중여부 && "submitting"]}>
   <Sidebar
     {브랜드}
@@ -741,9 +743,7 @@
       onclick={마진설정값가져오기팝업}>마진 설정값 가져오기</button>
     <div></div>
     <div></div>
-    <BackupRestore
-      bind:품목목록
-      {행업데이트} />
+    <BackupRestore bind:품목목록 />
     <div>
       <select
         name="item_order"
