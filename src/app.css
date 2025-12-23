@@ -207,6 +207,10 @@ select.app-user-select {
 .app-table tr.hidden .product_cell span::after {
   content: " (숨겨짐)";
 }
+.app-table tr.edited {
+  background: #0000ff06;
+  color: blue;
+}
 .app-table :is(th, td) {
   height: 1em;
   position: relative;
@@ -383,6 +387,39 @@ select.app-user-select {
   opacity: 1;
   pointer-events: unset;
 }
+
+.reset-field {
+  position: absolute;
+  top: 50%;
+  right: 1em;
+  transform: translateY(-50%);
+  border: none;
+  border-radius: 999px;
+  width: 1em;
+  height: 1em;
+  padding: 1em;
+  background: transparent;
+  color: #0003;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: 0.2s;
+}
+
+div:has(input:hover) + .reset-field,
+.reset-field:hover {
+  transition: 0s;
+  opacity: 1;
+}
+.reset-field:hover {
+  background: #0001;
+}
+.reset-field:active {
+  background: #0003;
+  transition: 0s;
+}
+
 :global(.ts-dropdown) {
   z-index: 99999;
 }

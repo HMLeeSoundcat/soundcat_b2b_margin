@@ -31,6 +31,8 @@
   let 품목목록: Types.품목목록타입 = $state({});
   let 품목목록사본: Types.품목목록타입 = $state({});
 
+  let 전개된품목목록: Types.개별품목타입[] = $derived(Object.values(품목목록사본).flat());
+
   let 브랜드: string[] | undefined = $state([]);
 
   let 브랜드파라미터: string | undefined | null = $state();
@@ -229,9 +231,13 @@
           });
         });
         품목목록사본 = structuredClone($state.snapshot(품목목록));
-        if (브랜드파라미터) 선택된브랜드 = 브랜드파라미터;
-
-        console.log($state.snapshot(품목목록));
+        if (브랜드파라미터 && 품목목록[브랜드파라미터]) {
+          선택된브랜드 = 브랜드파라미터;
+        } else if (브랜드파라미터) {
+          const url = new URL(location.href);
+          url.searchParams.delete("brand");
+          history.replaceState(null, "", url.href);
+        }
       } else {
         throw new Error("서버 접속 실패." + JSON.stringify(가져오기));
       }
@@ -311,11 +317,12 @@
 
   /**
    * 필드에 입력된 값을 적절한 형태(숫자, 문자열)로 안전하게 가공하고 품목 배열에 집어넣는다.
-   * @param v 입력된 값
+   * @param 값 입력된 값
    * @param 품목 개별 품목 행 (단일 혹은 전체)
    * @param 유형 현재 입력중인 필드명
+   * @param 리셋 선택된 필드(유형) 리셋 여부
    */
-  function 마진값셋터(v: string | number | undefined, 품목: Types.개별품목타입 | Types.개별품목타입[], 유형: keyof Types.마진설정값타입) {
+  function 마진값셋터(값: string | number | undefined, 품목: Types.개별품목타입 | Types.개별품목타입[], 유형: keyof Types.마진설정값타입, 리셋: boolean = false) {
     const 세팅할품목 = Array.isArray(품목) ? 품목 : [품목];
     let 링크값: keyof Types.마진설정값타입 | undefined = undefined;
     let 링크타겟: "link_def" | "link_disc" = "link_def";
@@ -330,7 +337,7 @@
      */
     const 링크값계산 = (링크값가격계산여부: boolean, 소비자가: number, 마진: string | number | undefined, 할인가: string | number | undefined) => {
       if (링크값가격계산여부) {
-        return parseFloat(String(소비자가)) * ((100 - parseFloat(String(숫자로변환(v ?? 마진)))) / 100);
+        return parseFloat(String(소비자가)) * ((100 - parseFloat(String(숫자로변환(값 ?? 마진)))) / 100);
       } else {
         return 100 - (parseFloat(String(할인가)) / parseFloat(String(소비자가))) * 100;
       }
@@ -361,6 +368,31 @@
     }
 
     for (const 품목 of 세팅할품목) {
+      if (리셋) {
+        if (유형 == "brand_disc_amount") {
+          품목.default_margin.brand_disc_amount = undefined;
+          continue;
+        }
+        if (선택된아이디.length > 0) {
+          for (const 각아이디 of 선택된아이디) {
+            if (품목.default_margin.per_user[각아이디]?.[유형]) delete 품목.default_margin.per_user[각아이디][유형];
+            if (품목.default_margin.per_user[각아이디]?.default_margin == 0 || 품목.default_margin.per_user[각아이디]?.default_margin == "0") {
+              delete 품목.default_margin.per_user[각아이디].default_margin;
+              delete 품목.default_margin.per_user[각아이디].default_prov;
+            }
+            if (품목.default_margin.per_user[각아이디]?.discount_margin == 0 || 품목.default_margin.per_user[각아이디]?.discount_margin == "0") {
+              delete 품목.default_margin.per_user[각아이디].discount_margin;
+              delete 품목.default_margin.per_user[각아이디].discount_price;
+            }
+            if ((품목.default_margin.per_user[각아이디] && Object.keys(품목.default_margin.per_user[각아이디]).length === 0) || Object.values({ ...품목.default_margin.per_user[각아이디], discount_price: 0, default_prov: 0 }).every(value => !value || value == "0")) delete 품목.default_margin.per_user[각아이디];
+          }
+        } else {
+          품목.default_margin[유형] = undefined;
+          if (품목.default_margin[링크타겟] && 링크값) 품목.default_margin[링크값] = undefined;
+        }
+        continue;
+      }
+
       let 마진설정할품목들: Omit<Types.마진설정값타입, "brand_disc_amount">[] = [];
 
       if (선택된아이디.length == 0) {
@@ -374,11 +406,14 @@
 
       for (const 마진설정할품목 of 마진설정할품목들) {
         if (유형 == "brand_disc_amount") continue;
-        마진설정할품목[유형] = 숫자로변환(v ?? 품목.default_margin[유형]);
+        마진설정할품목[유형] = 숫자로변환(값 ?? 품목.default_margin[유형]);
         if (품목.default_margin[링크타겟] && 링크값) 마진설정할품목[링크값] = 링크값계산(링크값가격계산여부, 품목.price, 마진설정할품목[유형], 마진설정할품목[유형]);
       }
+
       if (선택된아이디.length > 0) 품목.default_margin.per_user = { ...품목.default_margin.per_user };
     }
+
+    if (리셋) 행업데이트(품목, 유형);
   }
 
   /**
@@ -412,7 +447,7 @@
   function 브랜드값일괄편집<Target extends Exclude<keyof Types.마진타입, "per_user"> & Exclude<keyof Types.마진타입, "link_def"> & Exclude<keyof Types.마진타입, "link_disc">>(값: string | number, 타겟: Target) {
     선택된브랜드품목?.forEach(품목 => {
       (품목.default_margin as Types.마진타입)[타겟] = 숫자로변환(값);
-      변경된행.set($state.snapshot(품목).no_id, $state.snapshot(품목));
+      변경된행.set(품목.no_id, 품목);
     });
   }
 
@@ -436,7 +471,7 @@
           showCancelButton: true,
           cancelButtonText: "아니오",
           showDenyButton: !마진초기화팝업작게표시,
-          denyButtonText: "10분간 작게 알림",
+          denyButtonText: "5분간 작게 알림",
           toast: 마진초기화팝업작게표시,
           timer: 마진초기화팝업작게표시 ? 10000 : 0,
           timerProgressBar: 마진초기화팝업작게표시,
@@ -450,7 +485,8 @@
         if (!유저값초기화여부) 유저값초기화여부 = 팝업창.isConfirmed;
       }
       if (유저값초기화여부 && 품목.default_margin && typeof 품목.default_margin == "object") 품목.default_margin.per_user = {};
-      변경된행.set($state.snapshot(품목).no_id, $state.snapshot(품목));
+      품목.edited = true;
+      변경된행.set(품목.no_id, 품목);
     }
   }
 
@@ -483,7 +519,7 @@
 
       if (요청.ok) {
         const 결과: typeof 적용반환값 = await 요청.json();
-        await Swal.fire({
+        Swal.fire({
           icon: "success",
           title: "작업이 성공적으로 이루어졌습니다.",
           html: "&nbsp;",
@@ -498,6 +534,7 @@
         });
 
         적용반환값 = undefined;
+        [...변경된행.values()].forEach(x => delete x.edited);
         변경된행.clear();
         품목목록사본 = structuredClone($state.snapshot(품목목록));
       } else {
@@ -594,7 +631,7 @@
     }
   }
 
-  /** 테이블에서 스크롤 시 마스킹을 적용한다. */
+  /** 테이블에서 스크롤 시 모서리에 그라데이션을 적용한다. */
   function 테이블스크롤(e: UIEvent) {
     if (!테이블컨테이너) return;
 
@@ -715,7 +752,7 @@
 
   /** 마진을 초기화하겠냐는 팝업은 소비자가를 수정할 때 아이디 별 입력 값이 있으면 항상 표시되는데, 작게 표시를 누르면 작게 표시한다. (1분간) */
   $effect(() => {
-    if (마진초기화팝업작게표시) setTimeout(() => (마진초기화팝업작게표시 = false), 60000);
+    if (마진초기화팝업작게표시) setTimeout(() => (마진초기화팝업작게표시 = false), 300000);
   });
 </script>
 
@@ -773,7 +810,7 @@
                   품목.default_margin.link_disc = !품목.default_margin.link_disc;
                 }
               }
-              변경된행.set($state.snapshot(품목).no_id, $state.snapshot(품목));
+              변경된행.set(품목.no_id, 품목);
             });
           }} />선택된 브랜드 마진↔︎공급가 자동계산</label>
       <button
@@ -845,6 +882,15 @@
           } />
       </div>
     {/snippet}
+    {#snippet resetBtn(품목: Types.개별품목타입, target: keyof Types.마진설정값타입)}
+      <button
+        class="reset-field"
+        tabindex="-1"
+        aria-label="필드 값 리셋"
+        onclick={() => 마진값셋터(undefined, 품목, target, true)}>
+        <i class="fas fa-trash"></i>
+      </button>
+    {/snippet}
     <div
       class={["app-table-container"]}
       data-x="no"
@@ -912,7 +958,9 @@
         {#if 선택된브랜드품목.length}
           <tbody bind:this={품목테이블바디}>
             {#each 선택된브랜드품목 as 품목}
-              <tr class:hidden={parseInt(String(품목.hidden))}>
+              <tr
+                class:hidden={parseInt(String(품목.hidden))}
+                class:edited={품목.edited}>
                 <td class="product_cell">
                   <div>
                     <span>
@@ -940,12 +988,13 @@
                 {#if typeof 품목.default_margin == "object"}
                   <td class:peruser={수정여부확인(품목, "default_margin")}>
                     {@render eachProduct(품목, "default_margin")}
+                    {@render resetBtn(품목, "default_margin")}
                     <button
                       class="link"
                       tabindex="-1"
                       onclick={() => {
                         if (품목.default_margin && typeof 품목.default_margin == "object") 품목.default_margin.link_def = !품목.default_margin.link_def;
-                        변경된행.set($state.snapshot(품목).no_id, $state.snapshot(품목));
+                        변경된행.set(품목.no_id, 품목);
                       }}
                       aria-label="기본마진-공급가 자동계산"
                       ><i class={["fas", 품목.default_margin?.link_def ? "fa-link" : "fa-unlink"]}></i>
@@ -954,23 +1003,31 @@
                   </td>
                   <td class:peruser={수정여부확인(품목, "default_prov")}>
                     {@render eachProduct(품목, "default_prov")}
+                    {@render resetBtn(품목, "default_prov")}
                   </td>
                   <td class:peruser={수정여부확인(품목, "discount_margin")}>
                     {@render eachProduct(품목, "discount_margin")}
+                    {@render resetBtn(품목, "discount_margin")}
                     <button
                       class="link"
                       tabindex="-1"
                       onclick={() => {
                         if (품목.default_margin && typeof 품목.default_margin == "object") 품목.default_margin.link_disc = !품목.default_margin.link_disc;
-                        변경된행.set($state.snapshot(품목).no_id, $state.snapshot(품목));
+                        변경된행.set(품목.no_id, 품목);
                       }}
                       aria-label="할인마진-공급가 자동계산"
                       ><i class={["fas", 품목.default_margin?.link_disc ? "fa-link" : "fa-unlink"]}></i>
                       <b>할인마진↔︎공급가 자동계산</b>
                     </button>
                   </td>
-                  <td class:peruser={수정여부확인(품목, "discount_price")}> {@render eachProduct(품목, "discount_price")}</td>
-                  <td class:peruser={수정여부확인(품목, "discount_qty")}> {@render eachProduct(품목, "discount_qty")}</td>
+                  <td class:peruser={수정여부확인(품목, "discount_price")}>
+                    {@render eachProduct(품목, "discount_price")}
+                    {@render resetBtn(품목, "discount_price")}
+                  </td>
+                  <td class:peruser={수정여부확인(품목, "discount_qty")}>
+                    {@render eachProduct(품목, "discount_qty")}
+                    {@render resetBtn(품목, "discount_qty")}
+                  </td>
                   <td>
                     <div>
                       <input
@@ -982,7 +1039,9 @@
                             (품목.default_margin as Types.마진타입).brand_disc_amount = 숫자로변환(v);
                           }
                         } />
-                    </div></td>
+                    </div>
+                    {@render resetBtn(품목, "brand_disc_amount")}
+                  </td>
                 {/if}
               </tr>
             {/each}

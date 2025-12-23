@@ -1,7 +1,7 @@
 <script lang="ts">
   let { 품목목록 = $bindable() } = $props();
   import Swal from "sweetalert2";
-  import { compressToUTF16, decompressFromUTF16 } from "lz-string";
+  import { decompressFromUTF16 } from "lz-string";
   import Portal from "svelte-portal";
 
   let 팝업창열림여부: number | undefined = $state();
