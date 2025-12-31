@@ -31,8 +31,6 @@
   let 품목목록: Types.품목목록타입 = $state({});
   let 품목목록사본: Types.품목목록타입 = $state({});
 
-  let 전개된품목목록: Types.개별품목타입[] = $derived(Object.values(품목목록사본).flat());
-
   let 브랜드: string[] | undefined = $state([]);
 
   let 브랜드파라미터: string | undefined | null = $state();
