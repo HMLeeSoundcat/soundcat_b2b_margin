@@ -1,21 +1,3 @@
-.button {
-  border: none;
-  border-radius: 5px;
-  font-size: 1em;
-  padding: 0.5em 1em;
-  background: rgb(20, 185, 20);
-  box-shadow: 0 2px 4px #0003;
-  color: white;
-}
-.button:hover,
-.button:focus {
-  filter: brightness(1.1);
-}
-.button:active {
-  filter: brightness(1);
-  transform: translateY(1px);
-}
-
 .backup {
   background: royalblue;
 }
@@ -79,18 +61,6 @@
 .app_radio:has(input:focus) i {
   outline-color: royalblue;
 }
-
-input[type="text"] {
-  font-size: 1em;
-  padding: 0.5em;
-  border: 1px solid #eee;
-  border-radius: 4px;
-  box-shadow: 0 2px 2px #0004;
-  width: 100%;
-  margin-top: 1em;
-  text-align: center;
-}
-
 .file {
   display: none;
 }
