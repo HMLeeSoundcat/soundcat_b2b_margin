@@ -1,15 +1,15 @@
-.backup {
+button.backup {
   background: royalblue;
 }
 
-.restore {
+button.restore {
   background: rgb(255, 132, 0);
 }
 
-.red {
+button.red {
   background: rgb(200, 0, 0);
 }
-.grey {
+button.grey {
   background: rgb(120, 120, 120);
 }
 

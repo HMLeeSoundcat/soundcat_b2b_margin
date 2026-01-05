@@ -10,6 +10,8 @@
   import * as Types from "./types";
   import BackupRestore from "./Backup_Restore.svelte";
   import MarginGroups from "./Margin_Groups.svelte";
+  import { fly } from "svelte/transition";
+  import { flip } from "svelte/animate";
 
   const useDev = import.meta.env.MODE === "development";
 
@@ -79,6 +81,16 @@
       });
       return result;
     }
+  });
+
+  let 아이디별마진열림 = $derived.by(() => {
+    const obj: { [key: string]: boolean } = {};
+
+    선택된브랜드품목?.forEach(element => {
+      obj[element.PROD_CD] = false;
+    });
+
+    return obj;
   });
 
   let 변경된행 = new SvelteMap<Types.개별품목타입["no_id"], Types.개별품목타입>();
@@ -298,12 +310,14 @@
    * @param 품목 개별 품목 행 (단일 혹은 전체)
    * @param 유형 현재 입력중인 필드명
    */
-  function 마진값겟터(품목: Types.개별품목타입 | Types.개별품목타입[], 유형: keyof Omit<Types.마진설정값타입, "brand_disc_amount">) {
+  function 마진값겟터({ 품목, 유형, 각아이디 }: { 품목: Types.개별품목타입 | Types.개별품목타입[]; 유형: keyof Omit<Types.마진설정값타입, "brand_disc_amount">; 각아이디?: string }) {
     const 가져올품목 = Array.isArray(품목) ? 품목 : [품목];
     let 반환할값;
 
     for (품목 of 가져올품목) {
-      if (선택된아이디.length == 0) {
+      if (각아이디) {
+        return 로케일숫자로표시(품목.default_margin.per_user?.[각아이디]?.[유형] ?? 품목.default_margin[유형]);
+      } else if (선택된아이디.length == 0) {
         반환할값 = 로케일숫자로표시(품목.default_margin[유형]);
       } else {
         const 첫번째아이디값 = 품목.default_margin.per_user?.[선택된아이디[0]]?.[유형] ?? 품목.default_margin[유형];
@@ -324,7 +338,7 @@
    * @param 유형 현재 입력중인 필드명
    * @param 리셋 선택된 필드(유형) 리셋 여부
    */
-  function 마진값셋터(값: string | number | undefined, 품목: Types.개별품목타입 | Types.개별품목타입[], 유형: keyof Types.마진설정값타입, 리셋: boolean = false) {
+  function 마진값셋터({ 값, 품목, 유형, 각아이디, 리셋 = false }: { 값: string | number | undefined; 품목: Types.개별품목타입 | Types.개별품목타입[]; 유형: keyof Types.마진설정값타입; 각아이디?: string; 리셋?: boolean }) {
     const 세팅할품목 = Array.isArray(품목) ? 품목 : [품목];
     let 링크값: keyof Types.마진설정값타입 | undefined = undefined;
     let 링크타겟: "link_def" | "link_disc" = "link_def";
@@ -388,6 +402,10 @@
             }
             if ((품목.default_margin.per_user[각아이디] && Object.keys(품목.default_margin.per_user[각아이디]).length === 0) || Object.values({ ...품목.default_margin.per_user[각아이디], discount_price: 0, default_prov: 0 }).every(value => !value || value == "0")) delete 품목.default_margin.per_user[각아이디];
           }
+        }
+        if (각아이디) {
+          품목.default_margin.per_user[각아이디][유형] = undefined;
+          if (품목.default_margin[링크타겟] && 링크값) 품목.default_margin.per_user[각아이디][링크값] = undefined;
         } else {
           품목.default_margin[유형] = undefined;
           if (품목.default_margin[링크타겟] && 링크값) 품목.default_margin[링크값] = undefined;
@@ -397,7 +415,9 @@
 
       let 마진설정할품목들: Omit<Types.마진설정값타입, "brand_disc_amount">[] = [];
 
-      if (선택된아이디.length == 0) {
+      if (각아이디) {
+        마진설정할품목들.push(품목.default_margin.per_user[각아이디]);
+      } else if (선택된아이디.length == 0) {
         마진설정할품목들.push(품목.default_margin);
       } else {
         for (const 각아이디 of 선택된아이디) {
@@ -412,7 +432,7 @@
         if (품목.default_margin[링크타겟] && 링크값) 마진설정할품목[링크값] = 링크값계산(링크값가격계산여부, 품목.price, 마진설정할품목[유형], 마진설정할품목[유형]);
       }
 
-      if (선택된아이디.length > 0) 품목.default_margin.per_user = { ...품목.default_margin.per_user };
+      if (각아이디 || 선택된아이디.length > 0) 품목.default_margin.per_user = { ...품목.default_margin.per_user };
     }
 
     if (리셋) 행업데이트(품목, 유형);
@@ -772,15 +792,15 @@
       } />
   </div>
 {/snippet}
-{#snippet eachProduct(품목: Types.개별품목타입, target: keyof Omit<Types.마진설정값타입, "brand_disc_amount">)}
+{#snippet eachProduct(품목: Types.개별품목타입, target: keyof Omit<Types.마진설정값타입, "brand_disc_amount">, 각아이디?: string)}
   <div>
     <input
       type="text"
       onchange={() => 행업데이트(품목, target)}
       bind:value={
-        () => 마진값겟터(품목, target),
+        () => 마진값겟터({ 품목, 유형: target, 각아이디 }),
         (v: string | number | undefined) => {
-          마진값셋터(v, 품목, target);
+          마진값셋터({ 값: v, 품목, 유형: target, 각아이디 });
         }
       } />
   </div>
@@ -790,7 +810,7 @@
     class="reset-field"
     tabindex="-1"
     aria-label="필드 값 리셋"
-    onclick={() => 마진값셋터(undefined, 품목, target, true)}>
+    onclick={() => 마진값셋터({ 값: undefined, 품목, 유형: target, 리셋: true })}>
     <i class="fas fa-trash"></i>
   </button>
 {/snippet}
@@ -935,14 +955,14 @@
             <td>
               {@render brandAll("default_margin", (target, e) => {
                 if (!(e.currentTarget instanceof HTMLInputElement)) return;
-                마진값셋터(e.currentTarget.value, 선택된브랜드품목, target);
+                마진값셋터({ 값: e.currentTarget.value, 품목: 선택된브랜드품목, 유형: target });
                 행업데이트(선택된브랜드품목, target);
               })}</td>
             <td></td>
             <td>
               {@render brandAll("discount_margin", (target, e) => {
                 if (!(e.currentTarget instanceof HTMLInputElement)) return;
-                마진값셋터(e.currentTarget.value, 선택된브랜드품목, target);
+                마진값셋터({ 값: e.currentTarget.value, 품목: 선택된브랜드품목, 유형: target });
                 행업데이트(선택된브랜드품목, target);
               })}
             </td>
@@ -969,7 +989,7 @@
                 class:edited={품목.edited}>
                 <td class="product_cell">
                   <div>
-                    <span>
+                    <span style={아이디별마진열림[품목.PROD_CD] ? `font-weight: bold` : ""}>
                       {품목.product}
                       {#if 품목.href}
                         <a
@@ -979,11 +999,18 @@
                       {/if}
                     </span>
                     {#if Object.keys(품목.default_margin.per_user).length > 0}
-                      <span
+                      <button
+                        onclick={() => {
+                          const obj = structuredClone($state.snapshot(아이디별마진열림));
+                          obj[품목.PROD_CD] = !obj[품목.PROD_CD];
+                          아이디별마진열림 = obj;
+                        }}
+                        title="아이디 별 마진값 자세히 보기"
+                        aria-label="아이디 별 마진값 자세히 보기"
                         class="hasperuser"
                         data-peruser="해당 품목은 업체 별 마진값이 설정되어 있습니다.&#13;설정된 업체: {Object.keys(품목.default_margin.per_user)
                           .map(x => 아이디목록캐싱[x])
-                          .join(', ')}"><i class="fas fa-exclamation-circle"></i></span>
+                          .join(', ')}"><i class="fas fa-exclamation-circle"></i></button>
                     {/if}
                   </div>
                 </td>
@@ -1050,6 +1077,30 @@
                   </td>
                 {/if}
               </tr>
+              {#if 아이디별마진열림[품목.PROD_CD]}
+                <tr
+                  class="margin_details_operation dim"
+                  in:fly={{ y: -10, duration: 200 }}>
+                  <td colspan="8">
+                    <button class="button">현재 품목에 대해 업체 별 설정 값 초기화</button>
+                    <button class="button">현재 품목에 설정된 업체들 선택하기</button>
+                  </td>
+                </tr>
+                {#each Object.keys(품목.default_margin.per_user) as 각아이디}
+                  <tr class="margin_details dim">
+                    <td>
+                      <div><span>{아이디목록캐싱[각아이디]}</span></div>
+                    </td>
+                    <td></td>
+                    <td>{@render eachProduct(품목, "default_margin", 각아이디)}</td>
+                    <td>{@render eachProduct(품목, "default_prov", 각아이디)}</td>
+                    <td>{@render eachProduct(품목, "discount_margin", 각아이디)}</td>
+                    <td>{@render eachProduct(품목, "discount_price", 각아이디)}</td>
+                    <td>{@render eachProduct(품목, "discount_qty", 각아이디)}</td>
+                    <td></td>
+                  </tr>
+                {/each}
+              {/if}
             {/each}
           </tbody>
         {/if}
@@ -1107,4 +1158,5 @@
 
 <style>
   @import "./app.css";
+  @import "./common.css";
 </style>
