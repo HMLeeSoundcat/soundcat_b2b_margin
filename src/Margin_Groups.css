@@ -1,0 +1,113 @@
+.app-groups {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  margin-left: 1em;
+  align-items: flex-end;
+  height: 3em;
+}
+
+.app-groups li {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #eee;
+  border-right: none;
+  border-bottom: none;
+  overflow: hidden;
+  transition: 0.2s;
+}
+.app-groups li:nth-child(1) {
+  border-top-left-radius: 8px;
+}
+.app-groups li:nth-last-child(1) {
+  border-top-right-radius: 8px;
+  border-right: 1px solid #eee;
+}
+.app-groups li > :is(a, button) {
+  padding: 0.5em 1em;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  text-decoration: none;
+  color: black;
+  font-size: 1em;
+  background: transparent;
+  border: none;
+  margin: 0;
+  gap: 0.5em;
+  transition: 0.2s;
+  position: relative;
+}
+
+.app-groups li > :is(a, button):hover {
+  background: #f8f8f8;
+}
+
+.app-groups li.active {
+  border-radius: 8px 8px 0 0;
+}
+
+.app-groups li.active > :is(a, button) {
+  background: #eee;
+}
+.app-groups li.active > :is(a, button) {
+  padding: 0.7em 1em;
+  font-weight: bold;
+}
+.app-groups li > :is(a, button):active {
+  background: #e8e8e8;
+}
+
+.app-groups li a button {
+  background: transparent;
+  opacity: 0.5;
+  border: none;
+  padding: 0 0.5em;
+  margin: 0;
+  margin-right: -0.5em;
+}
+
+.group-menu {
+  position: absolute;
+  overflow: hidden;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  box-shadow: 0 2px 4px #0003;
+}
+
+.group-menu button {
+  font-size: 1em;
+  display: block;
+  padding: 1em;
+  text-align: left;
+  border: none;
+  background: white;
+}
+.group-menu button:hover {
+  background: #f8f8f8;
+}
+.group-menu button:active {
+  background: #eee;
+}
+
+.popup label {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.popup label span.text-within-label {
+  white-space: nowrap;
+}
+
+.popup label input {
+  margin: 0;
+}

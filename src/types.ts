@@ -47,3 +47,13 @@ export interface 품목테이블컬럼속성타입 {
     label: string;
   };
 }
+
+export interface 브랜드별마진그룹타입 {
+  uuid: string;
+  label: string;
+  active?: boolean;
+}
+
+export interface 마진그룹타입 {
+  [key: string]: 브랜드별마진그룹타입[];
+}

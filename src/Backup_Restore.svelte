@@ -365,4 +365,5 @@
 
 <style>
   @import "./Backup_Restore.css";
+  @import "./common.css";
 </style>

@@ -9,6 +9,7 @@
 
   import * as Types from "./types";
   import BackupRestore from "./Backup_Restore.svelte";
+  import MarginGroups from "./Margin_Groups.svelte";
 
   const useDev = import.meta.env.MODE === "development";
 
@@ -42,6 +43,9 @@
     | undefined = $state();
 
   let 선택된브랜드: string | undefined = $state();
+
+  let 마진그룹: Types.마진그룹타입 = $state({});
+  let 현재마진탭 = $state();
 
   /** 선택된브랜드의 값이 변경되면, 1. 선택된 품목정렬방법으로, 2. 품목목록으로부터 선택된브랜드 값을 뽑아 3. 정렬하고 배열에 담는다. */
   let 선택된브랜드품목 = $derived.by(() => {
@@ -704,7 +708,6 @@
   onMount(async () => {
     const url = new URL(location.href);
     브랜드파라미터 = url.searchParams.get("brand");
-    상세DB가져오기();
     품목목록가져오기();
     await 아이디가져오기();
   });
@@ -753,6 +756,44 @@
     if (마진초기화팝업작게표시) setTimeout(() => (마진초기화팝업작게표시 = false), 300000);
   });
 </script>
+
+{#snippet brandAll(target: keyof Types.마진설정값타입, callback: (target: keyof Types.마진설정값타입, e: Event) => void)}
+  <div>
+    <input
+      type="text"
+      onchange={e => {
+        callback(target, e);
+      }}
+      bind:value={
+        () => 로케일숫자로표시(브랜드일괄편집필드[target]),
+        (v: string | number) => {
+          브랜드일괄편집필드[target] = 숫자로변환(v);
+        }
+      } />
+  </div>
+{/snippet}
+{#snippet eachProduct(품목: Types.개별품목타입, target: keyof Omit<Types.마진설정값타입, "brand_disc_amount">)}
+  <div>
+    <input
+      type="text"
+      onchange={() => 행업데이트(품목, target)}
+      bind:value={
+        () => 마진값겟터(품목, target),
+        (v: string | number | undefined) => {
+          마진값셋터(v, 품목, target);
+        }
+      } />
+  </div>
+{/snippet}
+{#snippet resetBtn(품목: Types.개별품목타입, target: keyof Types.마진설정값타입)}
+  <button
+    class="reset-field"
+    tabindex="-1"
+    aria-label="필드 값 리셋"
+    onclick={() => 마진값셋터(undefined, 품목, target, true)}>
+    <i class="fas fa-trash"></i>
+  </button>
+{/snippet}
 
 <svelte:window
   onkeydown={테이블셀상하이동}
@@ -851,44 +892,11 @@
       </div>
     </div>
   {/if}
+  <MarginGroups
+    {선택된브랜드}
+    bind:마진그룹
+    bind:현재마진탭 />
   {#if 선택된브랜드 && 선택된브랜드품목}
-    {#snippet brandAll(target: keyof Types.마진설정값타입, callback: (target: keyof Types.마진설정값타입, e: Event) => void)}
-      <div>
-        <input
-          type="text"
-          onchange={e => {
-            callback(target, e);
-          }}
-          bind:value={
-            () => 로케일숫자로표시(브랜드일괄편집필드[target]),
-            (v: string | number) => {
-              브랜드일괄편집필드[target] = 숫자로변환(v);
-            }
-          } />
-      </div>
-    {/snippet}
-    {#snippet eachProduct(품목: Types.개별품목타입, target: keyof Omit<Types.마진설정값타입, "brand_disc_amount">)}
-      <div>
-        <input
-          type="text"
-          onchange={() => 행업데이트(품목, target)}
-          bind:value={
-            () => 마진값겟터(품목, target),
-            (v: string | number | undefined) => {
-              마진값셋터(v, 품목, target);
-            }
-          } />
-      </div>
-    {/snippet}
-    {#snippet resetBtn(품목: Types.개별품목타입, target: keyof Types.마진설정값타입)}
-      <button
-        class="reset-field"
-        tabindex="-1"
-        aria-label="필드 값 리셋"
-        onclick={() => 마진값셋터(undefined, 품목, target, true)}>
-        <i class="fas fa-trash"></i>
-      </button>
-    {/snippet}
     <div
       class={["app-table-container"]}
       data-x="no"
