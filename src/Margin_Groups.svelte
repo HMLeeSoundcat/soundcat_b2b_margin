@@ -8,9 +8,10 @@
   const useDev = import.meta.env.MODE === "development";
 
   let { 선택된브랜드, 현재마진탭 = $bindable(), 마진그룹 = $bindable() } = $props();
-  let 팝업창내용: { html: HTMLElement | undefined | null; label: string | undefined } = $state({
+  let 팝업창내용: { html: HTMLElement | undefined | null; label: string | undefined; useInput: boolean } = $state({
     html: undefined,
     label: undefined,
+    useInput: true,
   });
 
   let swal: typeof Swal | undefined = $state();
@@ -84,6 +85,7 @@
           icon: "success",
           title: "마진 그룹이 추가되었습니다.",
         });
+      마진그룹가져오기();
     } catch (e) {
       console.error((e as Error).message);
     } finally {
@@ -137,6 +139,51 @@
     } finally {
       팝업창내용.html = undefined;
       팝업창내용.label = undefined;
+      swal = undefined;
+    }
+  }
+
+  async function 그룹삭제(현재그룹명: string | undefined, uuid: string | undefined) {
+    if (!(현재그룹명 && uuid)) return;
+    groupMenu.active = false;
+
+    swal = Swal;
+    const popup = swal.fire({
+      title: `"<code>${현재그룹명}</code>" 그룹을 삭제하시겠습니까?`,
+      showConfirmButton: false,
+      showCancelButton: true,
+      cancelButtonText: "취소(닫기)",
+    });
+    팝업창내용.useInput = false;
+    팝업창내용.html = swal.getHtmlContainer();
+
+    try {
+      if (!(await popup).isConfirmed) throw "Cancelled";
+
+      const response = await fetch("https://b2b.soundcat.com/page/product_margin_group_update.php?uuid=" + uuid, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "Use-Dev": useDev ? "true" : "false",
+        },
+      });
+
+      if (!response.ok) throw new Error("서버 접속 실패");
+
+      const result = await response.json();
+
+      if (result.status == "success")
+        Swal.fire({
+          icon: "success",
+          title: "그룹이 삭제되었습니다.",
+        });
+      마진그룹가져오기();
+    } catch (e) {
+      console.error((e as Error).message);
+    } finally {
+      팝업창내용.html = undefined;
+      팝업창내용.label = undefined;
+      팝업창내용.useInput = true;
       swal = undefined;
     }
   }
@@ -202,7 +249,7 @@
       };
     }}>
     <button onclick={() => 그룹명편집(groupMenu.item?.label, groupMenu.item?.uuid)}>마진 그룹명 변경</button>
-    <button>마진 그룹 삭제</button>
+    <button onclick={() => 그룹삭제(groupMenu.item?.label, groupMenu.item?.uuid)}>마진 그룹 삭제</button>
   </div>
 {/if}
 {#if 팝업창내용.html}
@@ -213,12 +260,15 @@
         if (swal) swal.clickConfirm();
       }}
       class="popup">
-      <label>
-        <span class="text-within-label">그룹 이름: </span>
-        <input
-          type="text"
-          bind:value={팝업창내용.label} />
-      </label>
+      {#if 팝업창내용.useInput}
+        <label>
+          <span class="text-within-label">그룹 이름: </span>
+          <input
+            type="text"
+            bind:value={팝업창내용.label}
+            required />
+        </label>
+      {/if}
       <div style="margin-top: 1em;">
         <button
           class="button"

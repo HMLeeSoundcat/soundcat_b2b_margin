@@ -11,7 +11,6 @@
   import BackupRestore from "./Backup_Restore.svelte";
   import MarginGroups from "./Margin_Groups.svelte";
   import { fly } from "svelte/transition";
-  import { flip } from "svelte/animate";
 
   const useDev = import.meta.env.MODE === "development";
 

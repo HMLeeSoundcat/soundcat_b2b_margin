@@ -198,6 +198,7 @@ select.app-user-select {
 }
 .app-table tr {
   border-bottom: 1px solid #ddd;
+  position: relative;
 }
 .app-table tr.hidden .product_cell {
   color: #0005;
@@ -292,8 +293,15 @@ select.app-user-select {
   background: white;
   transition: border 0s;
 }
-.app-table tr:has(:focus) {
+.app-table tr:has(:focus)::after {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
   background: #0001;
+  z-index: -1;
 }
 .loading,
 .failed {
@@ -426,7 +434,7 @@ div:has(input:hover) + .reset-field,
 }
 
 .dim {
-  background: rgb(252, 255, 234);
+  background: rgba(237, 255, 137, 0.295);
 }
 :global(.ts-dropdown) {
   z-index: 99999;
