@@ -45,9 +45,6 @@
 
   let 선택된브랜드: string | undefined = $state();
 
-  let 마진그룹: Types.마진그룹타입 = $state({});
-  let 현재마진탭 = $state();
-
   /** 선택된브랜드의 값이 변경되면, 1. 선택된 품목정렬방법으로, 2. 품목목록으로부터 선택된브랜드 값을 뽑아 3. 정렬하고 배열에 담는다. */
   let 선택된브랜드품목 = $derived.by(() => {
     if (!선택된브랜드) return;
@@ -75,7 +72,7 @@
         });
       }
 
-      const result = mapped.map(el => {
+      const result = mapped.map((el) => {
         return 품목목록[선택된브랜드 as string][el.index];
       });
       return result;
@@ -85,7 +82,7 @@
   let 아이디별마진열림 = $derived.by(() => {
     const obj: { [key: string]: boolean } = {};
 
-    선택된브랜드품목?.forEach(element => {
+    선택된브랜드품목?.forEach((element) => {
       obj[element.PROD_CD] = false;
     });
 
@@ -95,14 +92,14 @@
   let 변경된행 = new SvelteMap<Types.개별품목타입["no_id"], Types.개별품목타입>();
   if (useDev) $inspect(변경된행);
 
-  let 마진공급가자동계산 = $derived(선택된브랜드품목?.every(품목 => 품목.default_margin && typeof 품목.default_margin == "object" && 품목.default_margin.link_def && 품목.default_margin.link_disc));
+  let 마진공급가자동계산 = $derived(선택된브랜드품목?.every((품목) => 품목.default_margin && typeof 품목.default_margin == "object" && 품목.default_margin.link_def && 품목.default_margin.link_disc));
 
   let 아이디목록: Types.아이디목록타입[] | undefined = $state([]);
 
   /** 마진 설정값 가져오기를 위한 변수로, 아이디-닉네임 쌍으로 된 객체로 변환 생성해준다. */
   let 아이디목록캐싱 = $derived.by(() => {
     const obj: { [key: string]: string } = {};
-    아이디목록?.forEach(element => {
+    아이디목록?.forEach((element) => {
       obj[element.mb_id] = element.mb_nick;
     });
     return obj;
@@ -193,6 +190,12 @@
 
   let 마진초기화팝업작게표시 = $state(false);
 
+  let 앱요소: HTMLElement | undefined = $state();
+  let 마진설정보기활성화 = $state(false);
+  let 마진설정보기팝업: HTMLElement | undefined = $state();
+  let 마진그룹: Types.마진그룹타입 = $state({});
+  let 현재마진탭: string | undefined = $state();
+
   function 브랜드일괄편집필드리셋() {
     브랜드일괄편집필드 = {
       default_margin: undefined,
@@ -223,7 +226,7 @@
       if (가져오기.ok) {
         const 결과: Types.품목목록타입 = await 가져오기.json();
         브랜드 = 결과 && Object.keys(결과);
-        브랜드.forEach(아이템 => {
+        브랜드.forEach((아이템) => {
           품목목록[아이템] = 결과[아이템].map((아이템: Types.개별품목타입) => {
             let default_margin;
             try {
@@ -399,7 +402,7 @@
               delete 품목.default_margin.per_user[각아이디].discount_margin;
               delete 품목.default_margin.per_user[각아이디].discount_price;
             }
-            if ((품목.default_margin.per_user[각아이디] && Object.keys(품목.default_margin.per_user[각아이디]).length === 0) || Object.values({ ...품목.default_margin.per_user[각아이디], discount_price: 0, default_prov: 0 }).every(value => !value || value == "0")) delete 품목.default_margin.per_user[각아이디];
+            if ((품목.default_margin.per_user[각아이디] && Object.keys(품목.default_margin.per_user[각아이디]).length === 0) || Object.values({ ...품목.default_margin.per_user[각아이디], discount_price: 0, default_prov: 0 }).every((value) => !value || value == "0")) delete 품목.default_margin.per_user[각아이디];
           }
         }
         if (각아이디) {
@@ -466,7 +469,7 @@
    * @param 타겟 어떤 필드에 들어가야 하는지 정의한다. boolean 타입과 object 타입에는 들어갈 수 없도록 타입 적용.
    */
   function 브랜드값일괄편집<Target extends Exclude<keyof Types.마진타입, "per_user"> & Exclude<keyof Types.마진타입, "link_def"> & Exclude<keyof Types.마진타입, "link_disc">>(값: string | number, 타겟: Target) {
-    선택된브랜드품목?.forEach(품목 => {
+    선택된브랜드품목?.forEach((품목) => {
       (품목.default_margin as Types.마진타입)[타겟] = 숫자로변환(값);
       변경된행.set(품목.no_id, 품목);
     });
@@ -487,7 +490,7 @@
         const 팝업창 = await Swal.fire({
           icon: "question",
           title: `입력한 품목에 대한 아이디 별 마진 설정 값을 초기화하시겠습니까?`,
-          html: `<details><summary>초기화 대상 품목 보기:</summary><div><code><pre>${세팅할품목.map(x => x.product).join("\n")}</pre></code></div></details><p>참고: 모든 대상 품목이 아이디 별 마진 설정 값이 있는 것은 아닙니다.</p>`,
+          html: `<details><summary>초기화 대상 품목 보기:</summary><div><code><pre>${세팅할품목.map((x) => x.product).join("\n")}</pre></code></div></details><p>참고: 모든 대상 품목이 아이디 별 마진 설정 값이 있는 것은 아닙니다.</p>`,
           confirmButtonText: "예",
           showCancelButton: true,
           cancelButtonText: "아니오",
@@ -555,7 +558,7 @@
         });
 
         적용반환값 = undefined;
-        [...변경된행.values()].forEach(x => delete x.edited);
+        [...변경된행.values()].forEach((x) => delete x.edited);
         변경된행.clear();
         품목목록사본 = structuredClone($state.snapshot(품목목록));
       } else {
@@ -650,6 +653,8 @@
     if ((e.target as HTMLElement).nodeName == "INPUT") {
       (e.target as HTMLInputElement)?.select();
     }
+
+    if (마진설정보기활성화 && e.target instanceof HTMLElement && 마진설정보기팝업 && !마진설정보기팝업.contains(e.target)) 마진설정보기활성화 = false;
   }
 
   /** 테이블에서 스크롤 시 모서리에 그라데이션을 적용한다. */
@@ -780,7 +785,7 @@
   <div>
     <input
       type="text"
-      onchange={e => {
+      onchange={(e) => {
         callback(target, e);
       }}
       bind:value={
@@ -805,46 +810,24 @@
   </div>
 {/snippet}
 {#snippet resetBtn(품목: Types.개별품목타입, target: keyof Types.마진설정값타입)}
-  <button
-    class="reset-field"
-    tabindex="-1"
-    aria-label="필드 값 리셋"
-    onclick={() => 마진값셋터({ 값: undefined, 품목, 유형: target, 리셋: true })}>
+  <button class="reset-field" tabindex="-1" aria-label="필드 값 리셋" onclick={() => 마진값셋터({ 값: undefined, 품목, 유형: target, 리셋: true })}>
     <i class="fas fa-trash"></i>
   </button>
 {/snippet}
 
-<svelte:window
-  onkeydown={테이블셀상하이동}
-  onpointerup={포인터업}
-  on:dragover={e => e.preventDefault()}
-  on:drop={e => e.preventDefault()} />
-<section class={["app-section", 적용중여부 && "submitting"]}>
-  <Sidebar
-    {브랜드}
-    bind:선택된브랜드
-    {품목목록가져오기} />
+<svelte:window onkeydown={테이블셀상하이동} onpointerup={포인터업} on:dragover={(e) => e.preventDefault()} on:drop={(e) => e.preventDefault()} />
+<div class={["app-section", 적용중여부 && "submitting", 마진설정보기활성화 && "margin_popup"]} bind:this={앱요소}>
+  <Sidebar {브랜드} bind:선택된브랜드 {품목목록가져오기} />
   <div class="app-toolbar">
     <div class="app-user-select-container">
-      <select
-        multiple
-        class="app-user-select"
-        bind:this={아이디입력상자}>
-      </select>
+      <select multiple class="app-user-select" bind:this={아이디입력상자}> </select>
     </div>
-    <button
-      type="button"
-      class={["blue", 선택된아이디.length || "disabled"]}
-      onclick={마진설정값가져오기팝업}>마진 설정값 가져오기</button>
+    <button type="button" class={["blue", 선택된아이디.length || "disabled"]} onclick={마진설정값가져오기팝업}>마진 설정값 가져오기</button>
     <div></div>
     <div></div>
     <BackupRestore bind:품목목록 />
     <div>
-      <select
-        name="item_order"
-        id="item_order"
-        bind:value={품목정렬방법}
-        placeholder="정렬방법">
+      <select name="item_order" id="item_order" bind:value={품목정렬방법} placeholder="정렬방법">
         {#each Object.entries(품목정렬방법타입) as 정렬방법}
           <option value={정렬방법[0]}>{정렬방법[1]}</option>
         {/each}
@@ -858,7 +841,7 @@
           bind:checked={마진공급가자동계산}
           onclick={() => {
             const 현재체크 = 마진공급가자동계산;
-            선택된브랜드품목?.forEach(품목 => {
+            선택된브랜드품목?.forEach((품목) => {
               if (품목.default_margin && typeof 품목.default_margin == "object") {
                 if (!현재체크) {
                   품목.default_margin.link_def = true;
@@ -879,10 +862,7 @@
           품목목록 = structuredClone($state.snapshot(품목목록사본));
           브랜드일괄편집필드리셋();
         }}><i class="fas fa-undo"></i> 변경 취소</button>
-      <button
-        type="button"
-        class={["submit", 내용변경여부 || "disabled"]}
-        onclick={적용}>
+      <button type="button" class={["submit", 내용변경여부 || "disabled"]} onclick={적용}>
         <i class="fas fa-check"></i> 저장
       </button>
     </div>
@@ -893,9 +873,7 @@
     <div class="failed">
       <div>브랜드 목록 가져오기를 실패했습니다. 재시도하시겠습니까?</div>
       <div>
-        <button
-          class="retry-btn"
-          onclick={() => 품목목록가져오기()}><i class="fas fa-redo"></i> 재시도</button>
+        <button class="retry-btn" onclick={() => 품목목록가져오기()}><i class="fas fa-redo"></i> 재시도</button>
       </div>
     </div>
   {/if}
@@ -905,23 +883,13 @@
     <div class="failed">
       <div>아이디 목록 가져오기를 실패했습니다. 재시도하시겠습니까?</div>
       <div>
-        <button
-          class="retry-btn"
-          onclick={() => 아이디가져오기()}><i class="fas fa-redo"></i> 재시도</button>
+        <button class="retry-btn" onclick={() => 아이디가져오기()}><i class="fas fa-redo"></i> 재시도</button>
       </div>
     </div>
   {/if}
-  <MarginGroups
-    {선택된브랜드}
-    bind:마진그룹
-    bind:현재마진탭 />
+  <MarginGroups {선택된브랜드} bind:마진그룹 bind:마진설정보기활성화 bind:마진설정보기팝업 bind:현재마진탭 {앱요소} {아이디목록} {아이디목록캐싱} />
   {#if 선택된브랜드 && 선택된브랜드품목}
-    <div
-      class={["app-table-container"]}
-      data-x="no"
-      data-y="bottom"
-      bind:this={테이블컨테이너}
-      onwheel={테이블스크롤}>
+    <div class={["app-table-container"]} data-x="no" data-y="bottom" bind:this={테이블컨테이너} onwheel={테이블스크롤}>
       <table class="app-table">
         <colgroup>
           {#each Object.keys(품목테이블컬럼속성) as 컬럼명}
@@ -983,18 +951,13 @@
         {#if 선택된브랜드품목.length}
           <tbody bind:this={품목테이블바디}>
             {#each 선택된브랜드품목 as 품목}
-              <tr
-                class:hidden={parseInt(String(품목.hidden))}
-                class:edited={품목.edited}>
+              <tr class:hidden={parseInt(String(품목.hidden))} class:edited={품목.edited}>
                 <td class="product_cell">
                   <div>
                     <span style={아이디별마진열림[품목.PROD_CD] ? `font-weight: bold` : ""}>
                       {품목.product}
                       {#if 품목.href}
-                        <a
-                          class="download_db"
-                          target="_blank"
-                          href={품목.href}>(상세DB 보기)</a>
+                        <a class="download_db" target="_blank" href={품목.href}>(상세DB 보기)</a>
                       {/if}
                     </span>
                     {#if Object.keys(품목.default_margin.per_user).length > 0}
@@ -1008,7 +971,7 @@
                         aria-label="아이디 별 마진값 자세히 보기"
                         class="hasperuser"
                         data-peruser="해당 품목은 업체 별 마진값이 설정되어 있습니다.&#13;설정된 업체: {Object.keys(품목.default_margin.per_user)
-                          .map(x => 아이디목록캐싱[x])
+                          .map((x) => 아이디목록캐싱[x])
                           .join(', ')}"><i class="fas fa-exclamation-circle"></i></button>
                     {/if}
                   </div>
@@ -1077,9 +1040,7 @@
                 {/if}
               </tr>
               {#if 아이디별마진열림[품목.PROD_CD]}
-                <tr
-                  class="margin_details_operation dim"
-                  in:fly={{ y: -10, duration: 200 }}>
+                <tr class="margin_details_operation dim" in:fly={{ y: -10, duration: 200 }}>
                   <td colspan="8">
                     <button class="button">현재 품목에 대해 업체 별 설정 값 초기화</button>
                     <button class="button">현재 품목에 설정된 업체들 선택하기</button>
@@ -1108,7 +1069,7 @@
   {:else}
     <div class="nobrand">좌측 사이드바를 클릭하여 브랜드를 선택하세요.</div>
   {/if}
-</section>
+</div>
 {#if 적용반환값}
   <Portal target=".successful-popup">
     <div>
@@ -1132,7 +1093,7 @@
         <input
           type="text"
           bind:value={마진설정값가져올아이디}
-          {@attach node => {
+          {@attach (node) => {
             const selectbox = new TomSelect(node, {
               valueField: "mb_id",
               labelField: "mb_nick",

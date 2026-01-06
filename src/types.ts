@@ -51,9 +51,13 @@ export interface 품목테이블컬럼속성타입 {
 export interface 브랜드별마진그룹타입 {
   uuid: string;
   label: string;
+  data: string | 마진그룹데이터타입 | null;
   active?: boolean;
+  element?: HTMLSelectElement | undefined;
 }
 
 export interface 마진그룹타입 {
   [key: string]: 브랜드별마진그룹타입[];
 }
+
+export type 마진그룹데이터타입 = 아이디목록타입["mb_id"][];

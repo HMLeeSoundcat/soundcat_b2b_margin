@@ -8,6 +8,9 @@
   height: 3em;
 }
 
+.app-groups .gap {
+  width: 1em;
+}
 .app-groups li {
   display: flex;
   align-items: center;
@@ -19,6 +22,10 @@
   transition: 0.2s;
 }
 .app-groups li:nth-child(1) {
+  border-radius: 8px 8px 0 0;
+  border-right: 1px solid #eee;
+}
+.app-groups li:nth-of-type(2) {
   border-top-left-radius: 8px;
 }
 .app-groups li:nth-last-child(1) {
@@ -110,4 +117,73 @@
 
 .popup label input {
   margin: 0;
+}
+
+.margin-popup-window {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 99;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.margin-popup-window .inner {
+  width: calc(100% - 8em);
+  height: calc(100% - 8em);
+  background: white;
+  border-radius: 1em;
+  box-shadow: 0 4px 8px #0004;
+  padding: 1em;
+  position: relative;
+  display: grid;
+  grid-template-rows: min-content calc(calc(100% - 4em) - 30px);
+  grid-template-areas: "title" "section";
+}
+
+.margin-popup-window .inner .title {
+  grid-area: title;
+  height: 30px;
+}
+
+button.close {
+  position: absolute;
+  top: 1em;
+  right: 1em;
+  font-size: 1em;
+}
+
+.select-section {
+  grid-area:section;
+  display: flex;
+  gap: 1em;
+  height: 100%;
+}
+.select-section .selection-group {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+.select-section .selection-group .group-title {
+  margin-bottom: 0.5rem;
+  font-size: 1.2em;
+  font-weight: bold;
+}
+.select-section .selection-group div[role="listbox"] {
+  flex-grow: 1;
+  font-size: 1em;
+  border-radius: 0.5em;
+  border: 1px solid #ccc;
+  height: 100%;
+  overflow: auto;
+}
+.select-section .selection-group div[role="listbox"] div[role="option"] {
+  padding: 0.5em;
+  /* user-select: none; */
+}
+.select-section .selection-group div[role="listbox"] div[role="option"].selected {
+  background: #eee;
 }

@@ -44,6 +44,15 @@ aside {
   opacity: 1;
   pointer-events: unset;
 }
+.app-sidebar {
+  pointer-events: none;
+  opacity: 0;
+  transition: .2s;
+}
+.app-sidebars.opened .app-sidebar {
+  pointer-events: visible;
+  opacity: 1;
+}
 nav {
   height: 100%;
 }
