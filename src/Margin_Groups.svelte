@@ -5,6 +5,7 @@
   import * as Types from "./types";
   import { fly, scale } from "svelte/transition";
   import { SvelteMap } from "svelte/reactivity";
+  import { flip } from "svelte/animate";
 
   interface Props {
     앱요소: HTMLElement | undefined;
@@ -23,8 +24,8 @@
 
   let { 앱요소, 선택된브랜드, 아이디목록, 편집된그룹, 마진그룹 = $bindable(), 마진그룹초기화 = $bindable(), 마진설정보기팝업 = $bindable(), 마진설정보기활성화 = $bindable(), 현재마진탭 = $bindable(), 선택된브랜드품목 = $bindable() }: Props = $props();
 
-  let 기본마진그룹아이디목록 = new SvelteMap<Types.확장된아이디목록["mb_id"], Types.확장된아이디목록>();
-  let 기타마진그룹아이디목록 = new SvelteMap<Types.확장된아이디목록["mb_id"], Types.확장된아이디목록>();
+  let 기본마진그룹아이디목록: Types.확장된아이디목록[] = $state([]);
+  let 미공급업체아이디목록: Types.확장된아이디목록[] = $state([]);
   let 마진그룹선택된브랜드: Types.브랜드별마진그룹타입[] = $state([]);
 
   $inspect(편집된그룹);
@@ -50,13 +51,13 @@
     element: undefined,
   });
 
-  let modifier = $state(false);
+  let modifier: string | undefined = $state(undefined);
+  let lastSelected: number = $state(Number.NEGATIVE_INFINITY);
+  $inspect(modifier);
 
   $effect(() => {
     if (!아이디목록) return;
-    아이디목록.forEach(element => {
-      기본마진그룹아이디목록.set(element.mb_id, element);
-    });
+    기본마진그룹아이디목록 = structuredClone($state.snapshot(아이디목록));
   });
 
   $effect(() => {
@@ -68,11 +69,11 @@
             data: 기본마진그룹아이디목록,
             element: undefined,
           },
-          ...마진그룹[선택된브랜드],
+          ...(마진그룹[선택된브랜드] ?? []),
           {
-            uuid: "extra",
-            label: "기타",
-            data: 기타마진그룹아이디목록,
+            uuid: "blocked",
+            label: "브랜드 숨길 업체",
+            data: 미공급업체아이디목록,
             element: undefined,
           },
         ]
@@ -103,10 +104,9 @@
       if (결과.status != "success") throw new Error("서버 작업 실패." + JSON.stringify(결과));
       마진그룹 = 결과.data;
       for (const 각그룹 in 마진그룹) {
-        마진그룹[각그룹].forEach(element => {
+        마진그룹[각그룹].forEach((element) => {
           const 기존데이터 = element.data;
-          if (!기존데이터) return (element.data = new SvelteMap());
-          if (Array.isArray(기존데이터)) element.data = new SvelteMap(기존데이터.map(x => [x.mb_id, x]));
+          if (!기존데이터) return (element.data = []);
         });
       }
     } catch (e) {
@@ -115,15 +115,19 @@
     }
   }
 
-  async function 새마진그룹(e: UIEvent) {
+  async function 새마진그룹(uuid: string | null | undefined = undefined) {
+    groupMenu.active = false;
     swal = Swal;
     const popup = swal.fire({
-      title: `<code>${선택된브랜드}</code> 브랜드에 새 마진 그룹 추가`,
+      title: uuid ? `현재 마진그룹 복제` : `<code>${선택된브랜드}</code> 브랜드에 새 마진 그룹 추가`,
       showConfirmButton: false,
       showCancelButton: true,
       cancelButtonText: "취소(닫기)",
     });
     팝업창내용.html = swal.getHtmlContainer();
+
+    if (uuid) {
+    }
 
     try {
       if (!(await popup).isConfirmed) throw "Cancelled";
@@ -144,14 +148,19 @@
 
       const result = await response.json();
 
-      if (result.status == "success")
+      마진그룹가져오기();
+      if (result.status != "success") throw new Error(result.data);
+      if (!uuid)
         Swal.fire({
           icon: "success",
           title: "마진 그룹이 추가되었습니다.",
         });
-      마진그룹가져오기();
     } catch (e) {
-      console.error((e as Error).message);
+      if ((e as Error).message)
+        Swal.fire({
+          title: (e as Error).message,
+          icon: "error",
+        });
     } finally {
       팝업창내용.html = undefined;
       팝업창내용.label = undefined;
@@ -207,8 +216,6 @@
     }
   }
 
-  async function 그룹항목편집() {}
-
   async function 그룹삭제(현재그룹명: string | undefined, uuid: string | null | undefined) {
     if (!(현재그룹명 && uuid)) return;
     groupMenu.active = false;
@@ -255,10 +262,10 @@
   }
 
   function 마진목록에서드래그작업(e: DragEvent, 마진탭: Types.브랜드별마진그룹타입) {
-    if (typeof 마진탭.data != "object" || 마진탭.data == null) return;
+    if (!Array.isArray(마진탭.data)) return;
     const obj = {
       uuid: 마진탭.uuid ?? null,
-      data: [...마진탭.data.values()].filter((x: Types.확장된아이디목록) => x.selected),
+      data: 마진탭.data.filter((x: Types.확장된아이디목록) => x.selected),
     };
     e.dataTransfer?.setData("text/plain", JSON.stringify(obj));
     const element = document.createElement("div");
@@ -274,22 +281,30 @@
     setTimeout(() => element.remove(), 0);
   }
 
+  let dragBoxIndex = $state(Number.NEGATIVE_INFINITY);
+
   function 드래그끝(e: DragEvent, 마진탭: Types.브랜드별마진그룹타입) {
     const data = JSON.parse(e.dataTransfer?.getData("text/plain") ?? "[]");
 
-    if (!(마진탭.data instanceof Map)) 마진탭.data = new SvelteMap();
+    if (!Array.isArray(마진탭.data)) 마진탭.data = [];
 
     if (data.uuid === 마진탭.uuid) return;
-    const ids = 마진그룹선택된브랜드.find(x => x.uuid === data.uuid)?.data;
+    const ids = 마진그룹선택된브랜드.find((x) => x.uuid === data.uuid)?.data;
 
     if (!Array.isArray(data.data)) return;
 
+    for (const element of 마진탭.data) {
+      element.selected = false;
+    }
+
     data.data.forEach((item: Types.확장된아이디목록) => {
-      if (!(ids instanceof Map && 마진탭.data instanceof Map)) return;
-      ids.delete(item.mb_id);
-      item.selected = false;
-      마진탭.data.set(item.mb_id, item);
+      if (!(Array.isArray(ids) && Array.isArray(마진탭.data))) return;
+      const index = ids.findIndex((x) => x.mb_id == item.mb_id);
+      if (index < 0) return;
+      ids.splice(index, 1);
     });
+
+    마진탭.data.splice(dragBoxIndex, 0, ...data.data);
 
     if (마진탭.uuid) 편집된그룹.set(마진탭.uuid, 마진탭);
   }
@@ -300,14 +315,14 @@
 </script>
 
 <svelte:window
-  onpointerdown={e => {
+  onpointerdown={(e) => {
     if (groupMenu.active && groupMenu.element && e.target instanceof HTMLElement && !groupMenu.element.contains(e.target)) groupMenu.active = false;
   }}
-  onkeydown={e => {
-    modifier = e.ctrlKey || e.metaKey;
+  onkeydown={(e) => {
+    modifier = e.ctrlKey || e.metaKey ? "add" : e.shiftKey ? "shift" : undefined;
   }}
-  onkeyup={e => {
-    modifier = e.ctrlKey || e.metaKey;
+  onkeyup={(e) => {
+    modifier = e.ctrlKey || e.metaKey ? "add" : e.shiftKey ? "shift" : undefined;
   }} />
 {#if 선택된브랜드}
   <ul class="app-groups">
@@ -323,7 +338,7 @@
           <button
             class="group-menu-btn"
             aria-label="그룹 메뉴"
-            onclick={e => {
+            onclick={(e) => {
               if (!앱요소) return;
               const rect = e.currentTarget.getBoundingClientRect();
               const 앱요소의크기 = 앱요소.getBoundingClientRect();
@@ -335,11 +350,8 @@
         </a>
       </li>
     {/each}
-    <li class={[현재마진탭 == "etc" && "active"]}>
-      <a href="#etc" onclick={() => (현재마진탭 = "etc")}>기타</a>
-    </li>
     <li>
-      <button onclick={새마진그룹}>+</button>
+      <button onclick={() => 새마진그룹()}>+</button>
     </li>
     <li>
       <button aria-label="도움말"><i class="fas fa-question-circle"></i></button>
@@ -359,13 +371,14 @@
       };
     }}>
     <button onclick={() => 그룹명편집(groupMenu.item?.label, groupMenu.item?.uuid)}>마진 그룹명 변경</button>
+    <button onclick={() => 새마진그룹(groupMenu.item?.uuid)}>마진 설정값 복제</button>
     <button onclick={() => 그룹삭제(groupMenu.item?.label, groupMenu.item?.uuid)}>마진 그룹 삭제</button>
   </div>
 {/if}
 {#if 팝업창내용.html}
   <Portal target={팝업창내용.html}>
     <form
-      onsubmit={e => {
+      onsubmit={(e) => {
         e.preventDefault();
         if (swal) swal.clickConfirm();
       }}
@@ -373,7 +386,7 @@
       {#if 팝업창내용.useInput}
         <label>
           <span class="text-within-label">그룹 이름: </span>
-          <input type="text" bind:value={팝업창내용.label} required />
+          <input class="group-name" type="text" bind:value={팝업창내용.label} required />
         </label>
       {/if}
       <div style="margin-top: 1em;">
@@ -391,9 +404,19 @@
           {#each 마진그룹선택된브랜드 as 마진탭}
             <div class="selection-group">
               <div class="group-title">{마진탭.label}</div>
-              <div role="listbox" aria-multiselectable="true" tabindex="0" id={마진탭.uuid} bind:this={마진탭.element} ondragover={e => e.preventDefault()} ondrop={e => 드래그끝(e, 마진탭)}>
-                {#if typeof 마진탭.data == "object" && 마진탭.data != null}
-                  {#each [...마진탭.data.values()] as 아이디}
+              <div
+                role="listbox"
+                aria-multiselectable="true"
+                tabindex="0"
+                id={마진탭.uuid}
+                bind:this={마진탭.element}
+                ondragover={(e) => {
+                  e.preventDefault();
+                  if (e.target instanceof HTMLElement && e.target == 마진탭.element) dragBoxIndex = 마진탭.data?.length ?? -1;
+                }}
+                ondrop={(e) => 드래그끝(e, 마진탭)}>
+                {#if Array.isArray(마진탭.data)}
+                  {#each 마진탭.data as 아이디, 인덱스 (아이디.mb_id)}
                     <div
                       class:selected={아이디.selected}
                       role="option"
@@ -401,41 +424,42 @@
                       aria-selected="false"
                       draggable="true"
                       data-value={아이디.mb_id}
-                      ondragstart={e => {
+                      animate:flip={{ duration: 200 }}
+                      ondragover={(e) => {
+                        dragBoxIndex = 인덱스;
+                      }}
+                      ondragstart={(e) => {
                         if (!(typeof 마진탭.data == "object" && 마진탭.data != null)) return;
+                        if (!Array.isArray(마진탭.data)) return;
                         if (!아이디.selected) {
-                          [...마진탭.data.values()].forEach(element => {
-                            if (!(마진탭.data instanceof Map)) return;
+                          마진탭.data.forEach((element) => {
+                            if (!Array.isArray(마진탭.data)) return;
                             if (!element.selected) return;
-                            마진탭.data.set(element.mb_id, {
-                              ...element,
-                              selected: false,
-                            });
+                            element.selected = false;
                           });
-                          if (!(마진탭.data instanceof Map)) return;
-                          마진탭.data.set(아이디.mb_id, {
-                            ...아이디,
-                            selected: true,
-                          });
+                          아이디.selected = true;
                         }
                         마진목록에서드래그작업(e, 마진탭);
                       }}
-                      onclickcapture={e => {
-                        if (!(typeof 마진탭.data == "object" && 마진탭.data != null)) return;
-                        if (!modifier)
-                          [...마진탭.data.values()].forEach(element => {
-                            if (!(마진탭.data instanceof Map)) return;
-                            if (!element.selected) return;
-                            마진탭.data.set(element.mb_id, {
-                              ...element,
-                              selected: false,
-                            });
-                          });
-                        if (!(마진탭.data instanceof Map)) return;
-                        마진탭.data.set(아이디.mb_id, {
-                          ...아이디,
-                          selected: true,
-                        });
+                      onclickcapture={(e) => {
+                        if (!Array.isArray(마진탭.data)) return;
+
+                        if (modifier != "add") {
+                          for (const element of 마진탭.data) {
+                            if (!element.selected) continue;
+                            element.selected = false;
+                          }
+                        }
+                        if (modifier == "shift") {
+                          const start = Math.min(lastSelected, 인덱스);
+                          const last = Math.max(lastSelected, 인덱스);
+                          for (const element of 마진탭.data.slice(start, last)) {
+                            element.selected = true;
+                          }
+                        }
+                        아이디.selected = true;
+
+                        if (modifier != "shift") lastSelected = 인덱스;
                       }}>
                       {아이디.mb_nick}
                     </div>

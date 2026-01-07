@@ -190,6 +190,10 @@ button.close {
   background: #eee;
 }
 
+:global(.swal2-html-container) input.group-name {
+  margin: 0;
+}
+
 :global(div.dragging-option) {
   width: 200px;
 }

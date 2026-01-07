@@ -57,7 +57,7 @@ export interface 품목테이블컬럼속성타입 {
 export interface 브랜드별마진그룹타입 {
   uuid: string | null;
   label: string;
-  data: 확장된아이디목록[] | SvelteMap<확장된아이디목록["mb_id"], 확장된아이디목록> | null;
+  data: 확장된아이디목록[] | null;
   active?: boolean;
   element?: HTMLElement | undefined;
 }
