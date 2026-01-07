@@ -166,11 +166,13 @@ button.close {
   flex-grow: 1;
   display: flex;
   flex-direction: column;
+  width: 100%;
 }
 .select-section .selection-group .group-title {
-  margin-bottom: 0.5rem;
+  margin-bottom: 1rem;
   font-size: 1.2em;
   font-weight: bold;
+  line-height: 1;
 }
 .select-section .selection-group div[role="listbox"] {
   flex-grow: 1;
@@ -180,10 +182,21 @@ button.close {
   height: 100%;
   overflow: auto;
 }
-.select-section .selection-group div[role="listbox"] div[role="option"] {
+.select-section .selection-group div[role="listbox"] div[role="option"], :global(div.dragging-option) {
   padding: 0.5em;
   /* user-select: none; */
 }
-.select-section .selection-group div[role="listbox"] div[role="option"].selected {
+.select-section .selection-group div[role="listbox"] div[role="option"].selected, :global(div.dragging-option) {
   background: #eee;
+}
+
+:global(div.dragging-option) {
+  width: 200px;
+}
+
+:global(div.dragging-container) {
+  position: fixed;
+  z-index: 99999;
+  top: 100%;
+  left: 100%;
 }

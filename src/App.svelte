@@ -47,7 +47,7 @@
 
   /** 선택된브랜드의 값이 변경되면, 1. 선택된 품목정렬방법으로, 2. 품목목록으로부터 선택된브랜드 값을 뽑아 3. 정렬하고 배열에 담는다. */
   let 선택된브랜드품목 = $derived.by(() => {
-    if (!선택된브랜드) return;
+    if (!선택된브랜드) return [];
 
     const 분해 = 품목정렬방법.split("_");
     const 필드: "name" | "noid" | "price" = ["name", "noid", "price"].includes(분해[0]) ? (분해[0] as "name" | "noid" | "price") : "name";
@@ -72,17 +72,19 @@
         });
       }
 
-      const result = mapped.map((el) => {
+      const result = mapped.map(el => {
         return 품목목록[선택된브랜드 as string][el.index];
       });
       return result;
     }
+
+    return [];
   });
 
   let 아이디별마진열림 = $derived.by(() => {
     const obj: { [key: string]: boolean } = {};
 
-    선택된브랜드품목?.forEach((element) => {
+    선택된브랜드품목?.forEach(element => {
       obj[element.PROD_CD] = false;
     });
 
@@ -90,16 +92,17 @@
   });
 
   let 변경된행 = new SvelteMap<Types.개별품목타입["no_id"], Types.개별품목타입>();
+  let 편집된그룹 = new SvelteMap<Types.브랜드별마진그룹타입["uuid"], Types.브랜드별마진그룹타입>();
   if (useDev) $inspect(변경된행);
 
-  let 마진공급가자동계산 = $derived(선택된브랜드품목?.every((품목) => 품목.default_margin && typeof 품목.default_margin == "object" && 품목.default_margin.link_def && 품목.default_margin.link_disc));
+  let 마진공급가자동계산 = $derived(선택된브랜드품목?.every(품목 => 품목.default_margin && typeof 품목.default_margin == "object" && 품목.default_margin.link_def && 품목.default_margin.link_disc));
 
-  let 아이디목록: Types.아이디목록타입[] | undefined = $state([]);
+  let 아이디목록: Types.아이디목록타입[] = $state([]);
 
   /** 마진 설정값 가져오기를 위한 변수로, 아이디-닉네임 쌍으로 된 객체로 변환 생성해준다. */
   let 아이디목록캐싱 = $derived.by(() => {
     const obj: { [key: string]: string } = {};
-    아이디목록?.forEach((element) => {
+    아이디목록?.forEach(element => {
       obj[element.mb_id] = element.mb_nick;
     });
     return obj;
@@ -193,8 +196,9 @@
   let 앱요소: HTMLElement | undefined = $state();
   let 마진설정보기활성화 = $state(false);
   let 마진설정보기팝업: HTMLElement | undefined = $state();
-  let 마진그룹: Types.마진그룹타입 = $state({});
-  let 현재마진탭: string | undefined = $state();
+  let 마진그룹: Types.마진그룹타입 = $derived({});
+  let 마진그룹초기화 = $state(false);
+  let 현재마진탭: string | null = $state(null);
 
   function 브랜드일괄편집필드리셋() {
     브랜드일괄편집필드 = {
@@ -226,7 +230,7 @@
       if (가져오기.ok) {
         const 결과: Types.품목목록타입 = await 가져오기.json();
         브랜드 = 결과 && Object.keys(결과);
-        브랜드.forEach((아이템) => {
+        브랜드.forEach(아이템 => {
           품목목록[아이템] = 결과[아이템].map((아이템: Types.개별품목타입) => {
             let default_margin;
             try {
@@ -285,7 +289,7 @@
       }
     } catch (e) {
       console.error(e);
-      아이디목록 = undefined;
+      아이디목록 = [];
     }
   }
 
@@ -402,7 +406,7 @@
               delete 품목.default_margin.per_user[각아이디].discount_margin;
               delete 품목.default_margin.per_user[각아이디].discount_price;
             }
-            if ((품목.default_margin.per_user[각아이디] && Object.keys(품목.default_margin.per_user[각아이디]).length === 0) || Object.values({ ...품목.default_margin.per_user[각아이디], discount_price: 0, default_prov: 0 }).every((value) => !value || value == "0")) delete 품목.default_margin.per_user[각아이디];
+            if ((품목.default_margin.per_user[각아이디] && Object.keys(품목.default_margin.per_user[각아이디]).length === 0) || Object.values({ ...품목.default_margin.per_user[각아이디], discount_price: 0, default_prov: 0 }).every(value => !value || value == "0")) delete 품목.default_margin.per_user[각아이디];
           }
         }
         if (각아이디) {
@@ -469,7 +473,7 @@
    * @param 타겟 어떤 필드에 들어가야 하는지 정의한다. boolean 타입과 object 타입에는 들어갈 수 없도록 타입 적용.
    */
   function 브랜드값일괄편집<Target extends Exclude<keyof Types.마진타입, "per_user"> & Exclude<keyof Types.마진타입, "link_def"> & Exclude<keyof Types.마진타입, "link_disc">>(값: string | number, 타겟: Target) {
-    선택된브랜드품목?.forEach((품목) => {
+    선택된브랜드품목?.forEach(품목 => {
       (품목.default_margin as Types.마진타입)[타겟] = 숫자로변환(값);
       변경된행.set(품목.no_id, 품목);
     });
@@ -490,7 +494,7 @@
         const 팝업창 = await Swal.fire({
           icon: "question",
           title: `입력한 품목에 대한 아이디 별 마진 설정 값을 초기화하시겠습니까?`,
-          html: `<details><summary>초기화 대상 품목 보기:</summary><div><code><pre>${세팅할품목.map((x) => x.product).join("\n")}</pre></code></div></details><p>참고: 모든 대상 품목이 아이디 별 마진 설정 값이 있는 것은 아닙니다.</p>`,
+          html: `<details><summary>초기화 대상 품목 보기:</summary><div><code><pre>${세팅할품목.map(x => x.product).join("\n")}</pre></code></div></details><p>참고: 모든 대상 품목이 아이디 별 마진 설정 값이 있는 것은 아닙니다.</p>`,
           confirmButtonText: "예",
           showCancelButton: true,
           cancelButtonText: "아니오",
@@ -532,37 +536,89 @@
   async function 적용() {
     적용중여부 = true;
     try {
-      const 요청 = await fetch("https://b2b.soundcat.com/page/margin_setup_update.php", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Use-Dev": String(useDev),
-        },
-        body: JSON.stringify([...변경된행.values()]),
-      });
-
-      if (요청.ok) {
-        const 결과: typeof 적용반환값 = await 요청.json();
-        Swal.fire({
-          icon: "success",
-          title: "작업이 성공적으로 이루어졌습니다.",
-          html: "&nbsp;",
-          confirmButtonText: "닫기",
-          customClass: {
-            htmlContainer: "successful-popup",
+      if (변경된행.size > 0) {
+        const 팝업 = Swal;
+        const 팝업창 = 팝업.fire({
+          title: "품목 마진 설정 값 적용 중...",
+          showConfirmButton: false,
+          allowEscapeKey: false,
+          allowOutsideClick: false,
+        });
+        const 요청 = await fetch("https://b2b.soundcat.com/page/margin_setup_update.php", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Use-Dev": String(useDev),
           },
-          willOpen: () => {
-            적용반환값 = 결과;
-            적용중여부 = false;
-          },
+          body: JSON.stringify([...변경된행.values()]),
         });
 
-        적용반환값 = undefined;
-        [...변경된행.values()].forEach((x) => delete x.edited);
-        변경된행.clear();
-        품목목록사본 = structuredClone($state.snapshot(품목목록));
-      } else {
-        throw new Error("서버에 접속하지 못했습니다: " + JSON.stringify(요청));
+        if (요청.ok) {
+          const 결과: typeof 적용반환값 = await 요청.json();
+          팝업.clickConfirm();
+          Swal.fire({
+            icon: "success",
+            title: "작업이 성공적으로 이루어졌습니다.",
+            html: "&nbsp;",
+            confirmButtonText: "닫기",
+            customClass: {
+              htmlContainer: "successful-popup",
+            },
+            willOpen: () => {
+              적용반환값 = 결과;
+              적용중여부 = false;
+            },
+          });
+
+          적용반환값 = undefined;
+          [...변경된행.values()].forEach(x => delete x.edited);
+          변경된행.clear();
+          품목목록사본 = structuredClone($state.snapshot(품목목록));
+        } else {
+          throw new Error("서버에 접속하지 못했습니다: " + JSON.stringify(요청));
+        }
+      }
+      if (편집된그룹.size > 0) {
+        const 팝업 = Swal;
+        const 팝업창 = 팝업.fire({
+          title: "마진 그룹 변경 사항 적용 중...",
+          showConfirmButton: false,
+          allowEscapeKey: false,
+          allowOutsideClick: false,
+        });
+        const 요청 = await fetch("https://b2b.soundcat.com/page/product_margin_group_update.php?action=data", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Use-Dev": String(useDev),
+          },
+          body: JSON.stringify([...변경된행.values()]),
+        });
+
+        if (요청.ok) {
+          const 결과: typeof 적용반환값 = await 요청.json();
+          팝업.clickConfirm();
+          Swal.fire({
+            icon: "success",
+            title: "작업이 성공적으로 이루어졌습니다.",
+            html: "&nbsp;",
+            confirmButtonText: "닫기",
+            customClass: {
+              htmlContainer: "successful-popup",
+            },
+            willOpen: () => {
+              적용반환값 = 결과;
+              적용중여부 = false;
+            },
+          });
+
+          적용반환값 = undefined;
+          [...변경된행.values()].forEach(x => delete x.edited);
+          변경된행.clear();
+          품목목록사본 = structuredClone($state.snapshot(품목목록));
+        } else {
+          throw new Error("서버에 접속하지 못했습니다: " + JSON.stringify(요청));
+        }
       }
     } catch (e) {
       console.error(e);
@@ -574,53 +630,6 @@
       });
     } finally {
       적용중여부 = false;
-    }
-  }
-
-  /** 상세DB 다운로드 게시판에서 품목에 해당하는 상세DB가 있는지 확인한다. */
-  async function 상세DB가져오기() {
-    if (!상세DB데이터) 상세DB데이터 = {};
-    let page = 1;
-    while (true) {
-      try {
-        const 요청 = await fetch("https://b2b.soundcat.com/bbs/board.php?bo_table=prod_db&api=json&scope=href,wr_2&page=" + page + (useDev ? "&usedev=true" : ""), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-        });
-
-        if (요청.ok) {
-          const 결과 = await 요청.json();
-
-          if (결과.status == "success") {
-            const 데이터 = 결과.data;
-            for (const 항목 of 데이터) {
-              if (항목["wr_2"]) {
-                try {
-                  const 항목나열 = JSON.parse(항목["wr_2"]);
-                  if (Array.isArray(항목나열)) {
-                    for (const element of 항목나열) {
-                      상세DB데이터[element] = 항목["href"];
-                    }
-                  }
-                } catch (e) {
-                  상세DB데이터[항목["wr_2"]] = 항목["href"];
-                }
-              }
-            }
-            page++;
-          } else {
-            throw new Error("상세DB 목록 조회 실패");
-          }
-        } else {
-          throw new Error("상세DB 서버 접속 실패");
-        }
-      } catch (e) {
-        console.log(e);
-        break;
-      }
     }
   }
 
@@ -755,7 +764,7 @@
 
   /** 변경된행 배열의 개수가 1개 이상이면 내용변경여부를 true로 아니면 false로 반환한다. */
   $effect(() => {
-    내용변경여부 = 변경된행.size > 0 ? true : false;
+    내용변경여부 = 변경된행.size > 0 || 편집된그룹.size > 0 ? true : false;
   });
 
   /** 상세DB데이터의 내용이 변경 또는 추가되면 품목목록에서 각 품목의 href 키에 상세DB 게시글 주소를 저장한다.*/
@@ -785,7 +794,7 @@
   <div>
     <input
       type="text"
-      onchange={(e) => {
+      onchange={e => {
         callback(target, e);
       }}
       bind:value={
@@ -815,7 +824,7 @@
   </button>
 {/snippet}
 
-<svelte:window onkeydown={테이블셀상하이동} onpointerup={포인터업} on:dragover={(e) => e.preventDefault()} on:drop={(e) => e.preventDefault()} />
+<svelte:window onkeydown={테이블셀상하이동} onpointerup={포인터업} on:dragover={e => e.preventDefault()} on:drop={e => e.preventDefault()} />
 <div class={["app-section", 적용중여부 && "submitting", 마진설정보기활성화 && "margin_popup"]} bind:this={앱요소}>
   <Sidebar {브랜드} bind:선택된브랜드 {품목목록가져오기} />
   <div class="app-toolbar">
@@ -841,7 +850,7 @@
           bind:checked={마진공급가자동계산}
           onclick={() => {
             const 현재체크 = 마진공급가자동계산;
-            선택된브랜드품목?.forEach((품목) => {
+            선택된브랜드품목?.forEach(품목 => {
               if (품목.default_margin && typeof 품목.default_margin == "object") {
                 if (!현재체크) {
                   품목.default_margin.link_def = true;
@@ -859,7 +868,9 @@
         class={["cancel", 내용변경여부 || "disabled"]}
         onclick={() => {
           변경된행.clear();
+          편집된그룹.clear();
           품목목록 = structuredClone($state.snapshot(품목목록사본));
+          마진그룹초기화 = true;
           브랜드일괄편집필드리셋();
         }}><i class="fas fa-undo"></i> 변경 취소</button>
       <button type="button" class={["submit", 내용변경여부 || "disabled"]} onclick={적용}>
@@ -887,7 +898,7 @@
       </div>
     </div>
   {/if}
-  <MarginGroups {선택된브랜드} bind:마진그룹 bind:마진설정보기활성화 bind:마진설정보기팝업 bind:현재마진탭 {앱요소} {아이디목록} {아이디목록캐싱} />
+  <MarginGroups {선택된브랜드} bind:마진그룹 bind:마진그룹초기화 bind:마진설정보기활성화 bind:마진설정보기팝업 bind:현재마진탭 {앱요소} {아이디목록} bind:선택된브랜드품목 {편집된그룹} />
   {#if 선택된브랜드 && 선택된브랜드품목}
     <div class={["app-table-container"]} data-x="no" data-y="bottom" bind:this={테이블컨테이너} onwheel={테이블스크롤}>
       <table class="app-table">
@@ -971,7 +982,7 @@
                         aria-label="아이디 별 마진값 자세히 보기"
                         class="hasperuser"
                         data-peruser="해당 품목은 업체 별 마진값이 설정되어 있습니다.&#13;설정된 업체: {Object.keys(품목.default_margin.per_user)
-                          .map((x) => 아이디목록캐싱[x])
+                          .map(x => 아이디목록캐싱[x])
                           .join(', ')}"><i class="fas fa-exclamation-circle"></i></button>
                     {/if}
                   </div>
@@ -1093,7 +1104,7 @@
         <input
           type="text"
           bind:value={마진설정값가져올아이디}
-          {@attach (node) => {
+          {@attach node => {
             const selectbox = new TomSelect(node, {
               valueField: "mb_id",
               labelField: "mb_nick",
