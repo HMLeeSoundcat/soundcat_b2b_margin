@@ -47,14 +47,15 @@
   align-items: center;
   flex-wrap: wrap;
 }
-.app-user-select-container {
+.app-prod-search-container {
   flex-grow: 1;
 }
-
-select.app-user-select {
-  width: 0;
-  height: 0;
-  display: none;
+.app-prod-search-container input {
+  width: 100%;
+  font-size: 1em;
+  padding: 0.5em;
+  border: 1px solid #ccc;
+  border-radius: 4px;
 }
 .app-submit-div {
   display: flex;
@@ -232,9 +233,6 @@ select.app-user-select {
   word-break: keep-all;
   overflow-wrap: break-word;
 }
-.app-table td.peruser {
-  background: rgba(255, 255, 0, 0.2) !important;
-}
 .app-table button.link {
   position: absolute;
   top: 50%;
@@ -372,49 +370,6 @@ select.app-user-select {
 .download_db:active {
   color: black;
 }
-button.hasperuser {
-  position: absolute;
-  top: 50%;
-  right: 1em;
-  transform: translateY(-50%);
-  color: #f006;
-  z-index: 5;
-  padding: 0.3em;
-  font-size: 1em;
-  border-radius: 4px;
-  border: 1px outset black;
-}
-button.hasperuser:hover {
-  background: #ddd;
-}
-button.hasperuser:active {
-  background: #ccc;
-}
-button.hasperuser::after {
-  content: attr(data-peruser);
-  position: absolute;
-  top: 50%;
-  left: 1.5rem;
-  color: white;
-  font-size: 0.8em;
-  white-space: pre-wrap;
-  background: #000a;
-  padding: 0.5rem;
-  border-radius: 0.5rem;
-  border: 2px solid white;
-  transform: translateY(-50%);
-  box-shadow: 0 4px 8px #0003;
-  opacity: 0;
-  min-width: 300px;
-  transition: 0.1s;
-  pointer-events: none;
-  text-align: left;
-}
-button.hasperuser:hover::after {
-  opacity: 1;
-  pointer-events: unset;
-}
-
 .reset-field {
   position: absolute;
   top: 50%;
@@ -445,10 +400,6 @@ div:has(input:hover) + .reset-field,
 .reset-field:active {
   background: #0003;
   transition: 0s;
-}
-
-.margin_details_operation td {
-  padding: 1em;
 }
 
 .dim {
