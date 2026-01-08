@@ -33,13 +33,14 @@ export interface 마진타입 extends 마진설정값타입 {
   per_user: {
     [key: string]: Omit<마진설정값타입, "brand_disc_amount">;
   };
+  per_group: {
+    [key: string]: Omit<마진설정값타입, "brand_disc_amount">
+  }
 }
 
 export interface 아이디목록타입 {
-  mb_no: string;
   mb_id: string;
   mb_nick: string;
-  mb_8: string;
 }
 
 export interface 확장된아이디목록 extends 아이디목록타입 {
@@ -58,8 +59,10 @@ export interface 브랜드별마진그룹타입 {
   uuid: string | null;
   label: string;
   data: 확장된아이디목록[] | null;
+  brand?: string;
   active?: boolean;
   element?: HTMLElement | undefined;
+  search: string | undefined
 }
 
 export interface 마진그룹타입 {
@@ -67,3 +70,10 @@ export interface 마진그룹타입 {
 }
 
 export type 마진그룹데이터타입 = 아이디목록타입[];
+
+export type 요청반환값 = {
+  method: string;
+  status: string;
+  error: string | null;
+  data: string[];
+} | null

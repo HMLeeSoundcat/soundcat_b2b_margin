@@ -13,22 +13,21 @@
     아이디목록: Types.확장된아이디목록[];
     편집된그룹: SvelteMap<Types.브랜드별마진그룹타입["uuid"], Types.브랜드별마진그룹타입>;
     마진그룹: Types.마진그룹타입;
-    마진그룹초기화: boolean;
+    마진그룹선택된브랜드: Types.브랜드별마진그룹타입[];
+    마진그룹갱신: boolean;
     마진설정보기팝업: HTMLElement | undefined;
     마진설정보기활성화: boolean;
-    현재마진탭: string | null;
+    현재마진탭: string;
     선택된브랜드품목: Types.개별품목타입[];
+    변경된행: SvelteMap<Types.개별품목타입["no_id"], Types.개별품목타입>;
   }
 
   const useDev = import.meta.env.MODE === "development";
 
-  let { 앱요소, 선택된브랜드, 아이디목록, 편집된그룹, 마진그룹 = $bindable(), 마진그룹초기화 = $bindable(), 마진설정보기팝업 = $bindable(), 마진설정보기활성화 = $bindable(), 현재마진탭 = $bindable(), 선택된브랜드품목 = $bindable() }: Props = $props();
+  let { 앱요소, 선택된브랜드, 아이디목록, 편집된그룹, 마진그룹 = $bindable(), 마진그룹선택된브랜드 = $bindable(), 마진그룹갱신 = $bindable(), 마진설정보기팝업 = $bindable(), 마진설정보기활성화 = $bindable(), 현재마진탭 = $bindable(), 선택된브랜드품목 = $bindable(), 변경된행 }: Props = $props();
 
   let 기본마진그룹아이디목록: Types.확장된아이디목록[] = $state([]);
   let 미공급업체아이디목록: Types.확장된아이디목록[] = $state([]);
-  let 마진그룹선택된브랜드: Types.브랜드별마진그룹타입[] = $state([]);
-
-  $inspect(편집된그룹);
 
   let 팝업창내용: { html: HTMLElement | undefined | null; label: string | undefined; useInput: boolean } = $state({
     html: undefined,
@@ -53,7 +52,6 @@
 
   let modifier: string | undefined = $state(undefined);
   let lastSelected: number = $state(Number.NEGATIVE_INFINITY);
-  $inspect(modifier);
 
   $effect(() => {
     if (!아이디목록) return;
@@ -61,30 +59,42 @@
   });
 
   $effect(() => {
+    if (!선택된브랜드) return;
+
+    const 설정된아이디 = new Set(마진그룹[선택된브랜드]?.flatMap(y => y.data?.map(d => d.mb_id)) || []);
+
     마진그룹선택된브랜드 = 선택된브랜드
       ? [
           {
-            uuid: null,
+            uuid: "default_margin",
+            brand: 선택된브랜드,
             label: "기본마진",
-            data: 기본마진그룹아이디목록,
-            element: undefined,
-          },
-          ...(마진그룹[선택된브랜드] ?? []),
-          {
-            uuid: "blocked",
-            label: "브랜드 숨길 업체",
             data: 미공급업체아이디목록,
             element: undefined,
+            search: undefined,
+          },
+          ...(마진그룹[선택된브랜드]?.filter(x => x.uuid != "default_margin").map(x => ({ ...x, search: undefined })) ?? []),
+          {
+            uuid: null,
+            brand: 선택된브랜드,
+            label: "미분류된 업체",
+            data: 기본마진그룹아이디목록.filter(x => !설정된아이디.has(x.mb_id)),
+            element: undefined,
+            search: undefined,
           },
         ]
       : [];
   });
 
   $effect(() => {
-    if (마진그룹초기화) {
+    if (마진그룹갱신) {
       마진그룹가져오기();
-      마진그룹초기화 = false;
+      마진그룹갱신 = false;
     }
+  });
+
+  $effect(() => {
+    미공급업체아이디목록 = 선택된브랜드 ? (마진그룹[선택된브랜드]?.find(x => x.uuid == "default_margin")?.data ?? []) : [];
   });
 
   async function 마진그룹가져오기() {
@@ -103,12 +113,6 @@
       const 결과: { [key: string]: any; data: Types.마진그룹타입 } = await 가져오기.json();
       if (결과.status != "success") throw new Error("서버 작업 실패." + JSON.stringify(결과));
       마진그룹 = 결과.data;
-      for (const 각그룹 in 마진그룹) {
-        마진그룹[각그룹].forEach((element) => {
-          const 기존데이터 = element.data;
-          if (!기존데이터) return (element.data = []);
-        });
-      }
     } catch (e) {
       console.error(e);
       마진그룹 = {};
@@ -126,12 +130,17 @@
     });
     팝업창내용.html = swal.getHtmlContainer();
 
-    if (uuid) {
-    }
-
     try {
       if (!(await popup).isConfirmed) throw "Cancelled";
 
+      if (!uuid) {
+        swal.fire({
+          title: "적용 중...",
+          showConfirmButton: false,
+          allowEscapeKey: false,
+          allowOutsideClick: false,
+        });
+      }
       const response = await fetch("https://b2b.soundcat.com/page/product_margin_group_update.php", {
         method: "POST",
         headers: {
@@ -141,20 +150,43 @@
         body: JSON.stringify({
           label: 팝업창내용.label,
           brand: 선택된브랜드,
+          data: [],
         }),
       });
+
+      swal.clickConfirm();
 
       if (!response.ok) throw new Error("서버 접속 실패");
 
       const result = await response.json();
 
-      마진그룹가져오기();
+      await 마진그룹가져오기();
+
       if (result.status != "success") throw new Error(result.data);
-      if (!uuid)
+      if (!uuid) {
         Swal.fire({
           icon: "success",
           title: "마진 그룹이 추가되었습니다.",
         });
+      } else {
+        const 추가된그룹아이디 = 마진그룹선택된브랜드.find(x => x.label == 팝업창내용.label)?.uuid;
+        for (const 품목 of 선택된브랜드품목) {
+          const 마진설정값 = 품목.default_margin;
+          if (!추가된그룹아이디) throw "추가된 그룹 아이디 못찾음";
+          마진설정값.per_group[추가된그룹아이디] = structuredClone($state.snapshot(마진설정값.per_group[uuid]));
+          품목.edited = true;
+          변경된행.set(품목.no_id, 품목);
+        }
+
+        현재마진탭 = 추가된그룹아이디 ?? uuid;
+
+        swal.fire({
+          icon: "success",
+          title: "그룹이 복제되었습니다.",
+          text: "창을 닫고 저장을 눌러서 적용시켜주세요.",
+          confirmButtonText: "닫기",
+        });
+      }
     } catch (e) {
       if ((e as Error).message)
         Swal.fire({
@@ -184,6 +216,13 @@
     try {
       if (!(await popup).isConfirmed) throw "Cancelled";
 
+      swal.fire({
+        title: "적용 중...",
+        showConfirmButton: false,
+        allowEscapeKey: false,
+        allowOutsideClick: false,
+      });
+
       const response = await fetch("https://b2b.soundcat.com/page/product_margin_group_update.php?action=label", {
         method: "PATCH",
         headers: {
@@ -196,6 +235,8 @@
           brand: 선택된브랜드,
         }),
       });
+
+      swal.clickConfirm();
 
       if (!response.ok) throw new Error("서버 접속 실패");
 
@@ -229,7 +270,6 @@
     });
     팝업창내용.useInput = false;
     팝업창내용.html = swal.getHtmlContainer();
-
     try {
       if (!(await popup).isConfirmed) throw "Cancelled";
 
@@ -245,12 +285,25 @@
 
       const result = await response.json();
 
+      await 마진그룹가져오기();
+
+      현재마진탭 = "default_margin";
+
+      for (const 품목 of 선택된브랜드품목) {
+        const 마진설정값 = 품목.default_margin;
+        if (!uuid) throw "삭제한 UUID 못찾음";
+        delete 마진설정값.per_group[uuid];
+        품목.edited = true;
+        변경된행.set(품목.no_id, 품목);
+      }
+
       if (result.status == "success")
         Swal.fire({
           icon: "success",
           title: "그룹이 삭제되었습니다.",
+          text: "창을 닫고 저장을 눌러 기존 그룹의 마진값을 삭제해주세요.",
+          confirmButtonText: "닫기",
         });
-      마진그룹가져오기();
     } catch (e) {
       console.error((e as Error).message);
     } finally {
@@ -289,7 +342,7 @@
     if (!Array.isArray(마진탭.data)) 마진탭.data = [];
 
     if (data.uuid === 마진탭.uuid) return;
-    const ids = 마진그룹선택된브랜드.find((x) => x.uuid === data.uuid)?.data;
+    const ids = 마진그룹선택된브랜드.find(x => x.uuid === data.uuid)?.data;
 
     if (!Array.isArray(data.data)) return;
 
@@ -299,14 +352,27 @@
 
     data.data.forEach((item: Types.확장된아이디목록) => {
       if (!(Array.isArray(ids) && Array.isArray(마진탭.data))) return;
-      const index = ids.findIndex((x) => x.mb_id == item.mb_id);
+      const index = ids.findIndex(x => x.mb_id == item.mb_id);
       if (index < 0) return;
       ids.splice(index, 1);
     });
 
     마진탭.data.splice(dragBoxIndex, 0, ...data.data);
 
-    if (마진탭.uuid) 편집된그룹.set(마진탭.uuid, 마진탭);
+    if (마진탭.uuid)
+      편집된그룹.set(마진탭.uuid, {
+        ...마진탭,
+        brand: 선택된브랜드,
+        element: undefined,
+      });
+
+    const 기존마진그룹목록 = 마진그룹선택된브랜드.find(x => x.uuid == data.uuid);
+    if (기존마진그룹목록 && data.uuid !== null) 편집된그룹.set(data.uuid, 기존마진그룹목록);
+  }
+
+  function 아이디검색필터(item: Types.아이디목록타입, 마진탭: Types.브랜드별마진그룹타입) {
+    if (!마진탭.search) return true;
+    if (item.mb_nick.toLowerCase().includes(마진탭.search.toString().toLowerCase())) return true;
   }
 
   onMount(async () => {
@@ -315,30 +381,30 @@
 </script>
 
 <svelte:window
-  onpointerdown={(e) => {
+  onpointerdown={e => {
     if (groupMenu.active && groupMenu.element && e.target instanceof HTMLElement && !groupMenu.element.contains(e.target)) groupMenu.active = false;
   }}
-  onkeydown={(e) => {
+  onkeydown={e => {
     modifier = e.ctrlKey || e.metaKey ? "add" : e.shiftKey ? "shift" : undefined;
   }}
-  onkeyup={(e) => {
+  onkeyup={e => {
     modifier = e.ctrlKey || e.metaKey ? "add" : e.shiftKey ? "shift" : undefined;
   }} />
 {#if 선택된브랜드}
   <ul class="app-groups">
     <li><button aria-label="마진 설정 보기" title="마진 설정 보기" onclick={() => (마진설정보기활성화 = true)}><i class="far fa-window-restore"></i></button></li>
     <div class="gap"></div>
-    <li class={[(현재마진탭 == "default" || 현재마진탭 == undefined) && "active"]}>
-      <a href="#default" onclick={() => (현재마진탭 = null)}>기본마진</a>
+    <li class={[(현재마진탭 == "default_margin" || 현재마진탭 == undefined) && "active"]}>
+      <a href="#default_margin" onclick={() => (현재마진탭 = "default_margin")}>기본마진</a>
     </li>
-    {#each 마진그룹[선택된브랜드] as 마진탭 (마진탭.uuid)}
+    {#each 마진그룹[선택된브랜드]?.filter(x => x.uuid !== "default_margin") ?? [] as 마진탭 (마진탭.uuid)}
       <li class={[현재마진탭 == 마진탭.uuid && "active"]}>
-        <a href="#{마진탭.uuid}" onclick={() => (현재마진탭 = 마진탭.uuid)}>
+        <a href="#{마진탭.uuid}" onclick={() => (현재마진탭 = 마진탭.uuid ?? "default_margin")}>
           {마진탭.label}
           <button
             class="group-menu-btn"
             aria-label="그룹 메뉴"
-            onclick={(e) => {
+            onclick={e => {
               if (!앱요소) return;
               const rect = e.currentTarget.getBoundingClientRect();
               const 앱요소의크기 = 앱요소.getBoundingClientRect();
@@ -378,7 +444,7 @@
 {#if 팝업창내용.html}
   <Portal target={팝업창내용.html}>
     <form
-      onsubmit={(e) => {
+      onsubmit={e => {
         e.preventDefault();
         if (swal) swal.clickConfirm();
       }}
@@ -386,7 +452,14 @@
       {#if 팝업창내용.useInput}
         <label>
           <span class="text-within-label">그룹 이름: </span>
-          <input class="group-name" type="text" bind:value={팝업창내용.label} required />
+          <input
+            class="group-name"
+            type="text"
+            bind:value={팝업창내용.label}
+            required
+            {@attach node => {
+              setTimeout(() => node.select(), 0);
+            }} />
         </label>
       {/if}
       <div style="margin-top: 1em;">
@@ -404,19 +477,22 @@
           {#each 마진그룹선택된브랜드 as 마진탭}
             <div class="selection-group">
               <div class="group-title">{마진탭.label}</div>
+              <div class="group-search">
+                <input type="text" bind:value={마진탭.search} placeholder="{마진탭.label} 그룹 내 검색..." {@attach () => (마진탭.search = undefined)} />
+              </div>
               <div
                 role="listbox"
                 aria-multiselectable="true"
                 tabindex="0"
                 id={마진탭.uuid}
                 bind:this={마진탭.element}
-                ondragover={(e) => {
+                ondragover={e => {
                   e.preventDefault();
                   if (e.target instanceof HTMLElement && e.target == 마진탭.element) dragBoxIndex = 마진탭.data?.length ?? -1;
                 }}
-                ondrop={(e) => 드래그끝(e, 마진탭)}>
+                ondrop={e => 드래그끝(e, 마진탭)}>
                 {#if Array.isArray(마진탭.data)}
-                  {#each 마진탭.data as 아이디, 인덱스 (아이디.mb_id)}
+                  {#each 마진탭.data.filter(item => 아이디검색필터(item, 마진탭)) as 아이디, 인덱스 (아이디.mb_id)}
                     <div
                       class:selected={아이디.selected}
                       role="option"
@@ -425,14 +501,14 @@
                       draggable="true"
                       data-value={아이디.mb_id}
                       animate:flip={{ duration: 200 }}
-                      ondragover={(e) => {
+                      ondragover={e => {
                         dragBoxIndex = 인덱스;
                       }}
-                      ondragstart={(e) => {
+                      ondragstart={e => {
                         if (!(typeof 마진탭.data == "object" && 마진탭.data != null)) return;
                         if (!Array.isArray(마진탭.data)) return;
                         if (!아이디.selected) {
-                          마진탭.data.forEach((element) => {
+                          마진탭.data.forEach(element => {
                             if (!Array.isArray(마진탭.data)) return;
                             if (!element.selected) return;
                             element.selected = false;
@@ -441,7 +517,7 @@
                         }
                         마진목록에서드래그작업(e, 마진탭);
                       }}
-                      onclickcapture={(e) => {
+                      onclickcapture={e => {
                         if (!Array.isArray(마진탭.data)) return;
 
                         if (modifier != "add") {
@@ -453,7 +529,7 @@
                         if (modifier == "shift") {
                           const start = Math.min(lastSelected, 인덱스);
                           const last = Math.max(lastSelected, 인덱스);
-                          for (const element of 마진탭.data.slice(start, last)) {
+                          for (const element of 마진탭.data.filter(item => 아이디검색필터(item, 마진탭)).slice(start, last)) {
                             element.selected = true;
                           }
                         }
