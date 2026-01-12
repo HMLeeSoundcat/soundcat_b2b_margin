@@ -674,7 +674,7 @@
 
 <svelte:window onkeydown={테이블셀상하이동} onpointerup={포인터업} on:dragover={e => e.preventDefault()} on:drop={e => e.preventDefault()} />
 <div class={["app-section", 마진설정보기활성화 && "margin_popup"]} bind:this={앱요소}>
-  <Sidebar {브랜드} bind:선택된브랜드 {품목목록가져오기} />
+  <Sidebar {브랜드} bind:선택된브랜드 {마진그룹} {품목목록가져오기} />
   <div class="app-toolbar">
     <div class="app-prod-search-container">
       <input type="text" bind:value={품목검색} placeholder="품목명 검색..." />

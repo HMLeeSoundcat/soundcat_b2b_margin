@@ -69,12 +69,16 @@ li button {
   padding: 0.7em 1em;
   background: none;
   margin: 0;
-  display: block;
+  display: flex;
   font-size: 1em;
   border-radius: 0.5em;
   width: 100%;
   text-align: left;
   color: black;
+  gap: 0.5em;
+  align-items: center;
+  position:relative;
+  box-sizing: border-box;
 }
 li button:hover,
 li button:focus {
@@ -87,6 +91,53 @@ li button:active {
 li button.active {
   background: rgb(10, 127, 251);
   color: white;
+}
+
+li button .label {
+  flex-grow: 1;
+}
+
+li button:has(.has-val) .label {
+  flex-grow: 0;
+}
+li button .has-val {
+  flex-grow: 1;
+}
+li button .has-val i {
+  display: inline-block;
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 999px;
+  background-color: #ff9933;
+}
+
+li button .fas {
+  color: #ff0000;
+  padding: 0 0.5em;
+}
+
+li button .fas::after {
+  content: "현재 이 브랜드를 발주할 수 있는 업체가 하나도 없습니다.";
+  position: absolute;
+  color: white;
+  background-color: #f00c;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  padding: 0.3em;
+  border-radius: 0.5em;
+  pointer-events: none;
+  opacity: 0;
+  transition: .2s;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+li button .fas:hover::after{
+  opacity: 1;
 }
 
 .app-sidebar-btn {
