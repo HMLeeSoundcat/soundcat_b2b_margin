@@ -140,13 +140,13 @@
   padding: 1em;
   position: relative;
   display: grid;
-  grid-template-rows: min-content calc(calc(100% - 4em) - 30px);
+  grid-template-rows: min-content calc(calc(100% - 4em) - 70px);
   grid-template-areas: "title" "section";
 }
 
 .margin-popup-window .inner .title {
   grid-area: title;
-  height: 30px;
+  height: 70px;
 }
 
 button.close {

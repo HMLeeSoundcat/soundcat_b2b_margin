@@ -53,6 +53,12 @@
   let modifier: string | undefined = $state(undefined);
   let lastSelected: number = $state(Number.NEGATIVE_INFINITY);
 
+  let 드래그하고있는마진탭: Types.브랜드별마진그룹타입 | undefined = $state();
+
+  let 마진탭들: Types.브랜드별마진그룹타입[] = $state([]);
+
+  let 마진탭순서바꿈 = $state(false);
+
   $effect(() => {
     if (!아이디목록) return;
     기본마진그룹아이디목록 = structuredClone($state.snapshot(아이디목록));
@@ -66,6 +72,7 @@
     마진그룹선택된브랜드 = 선택된브랜드
       ? [
           {
+            idx: 0,
             uuid: "default_margin",
             brand: 선택된브랜드,
             label: "기본마진",
@@ -73,8 +80,12 @@
             element: undefined,
             search: undefined,
           },
-          ...(마진그룹[선택된브랜드]?.filter(x => x.uuid != "default_margin").map(x => ({ ...x, search: undefined })) ?? []),
+          ...(마진그룹[선택된브랜드]
+            ?.filter(x => x.uuid != "default_margin")
+            .map(x => ({ ...x, search: undefined }))
+            .sort((a, b) => a.idx - b.idx) ?? []),
           {
+            idx: 999,
             uuid: null,
             brand: 선택된브랜드,
             label: "미분류된 업체",
@@ -95,6 +106,10 @@
 
   $effect(() => {
     미공급업체아이디목록 = 선택된브랜드 ? (마진그룹[선택된브랜드]?.find(x => x.uuid == "default_margin")?.data ?? []) : [];
+  });
+
+  $effect(() => {
+    if (선택된브랜드 && 마진그룹선택된브랜드.length) 마진탭들 = 마진그룹[선택된브랜드]?.filter(x => x.uuid !== "default_margin").sort((a, b) => a.idx - b.idx) ?? [];
   });
 
   async function 마진그룹가져오기() {
@@ -121,6 +136,7 @@
 
   async function 새마진그룹(uuid: string | null | undefined = undefined) {
     groupMenu.active = false;
+    if (!선택된브랜드) return;
     swal = Swal;
     const popup = swal.fire({
       title: uuid ? `현재 마진그룹 복제` : `<code>${선택된브랜드}</code> 브랜드에 새 마진 그룹 추가`,
@@ -150,6 +166,7 @@
         body: JSON.stringify({
           label: 팝업창내용.label,
           brand: 선택된브랜드,
+          idx: 마진그룹[선택된브랜드].length,
           data: [],
         }),
       });
@@ -200,7 +217,7 @@
     }
   }
 
-  async function 그룹명편집(현재그룹명: string | undefined, uuid: string | null | undefined) {
+  async function 그룹명편집(현재그룹명: string | undefined, uuid: string | null | undefined, idx: number) {
     if (!(현재그룹명 && uuid)) return;
     groupMenu.active = false;
 
@@ -233,6 +250,7 @@
           uuid,
           label: 팝업창내용.label,
           brand: 선택된브랜드,
+          idx,
         }),
       });
 
@@ -273,6 +291,13 @@
     try {
       if (!(await popup).isConfirmed) throw "Cancelled";
 
+      swal.fire({
+        title: "적용 중...",
+        showConfirmButton: false,
+        allowEscapeKey: false,
+        allowOutsideClick: false,
+      });
+
       const response = await fetch("https://b2b.soundcat.com/page/product_margin_group_update.php?uuid=" + uuid, {
         method: "DELETE",
         headers: {
@@ -296,6 +321,8 @@
         품목.edited = true;
         변경된행.set(품목.no_id, 품목);
       }
+
+      swal.clickConfirm();
 
       if (result.status == "success")
         Swal.fire({
@@ -359,7 +386,7 @@
 
     마진탭.data.splice(dragBoxIndex, 0, ...data.data);
 
-    if (마진탭.uuid)
+    if (마진탭.uuid && 선택된브랜드)
       편집된그룹.set(마진탭.uuid, {
         ...마진탭,
         brand: 선택된브랜드,
@@ -373,6 +400,78 @@
   function 아이디검색필터(item: Types.아이디목록타입, 마진탭: Types.브랜드별마진그룹타입) {
     if (!마진탭.search) return true;
     if (item.mb_nick.toLowerCase().includes(마진탭.search.toString().toLowerCase())) return true;
+  }
+
+  function 마진탭드래그(e: DragEvent, 마진탭: Types.브랜드별마진그룹타입) {
+    if (!마진탭.uuid) return;
+    드래그하고있는마진탭 = 마진탭;
+    if (e.currentTarget instanceof HTMLElement) e.dataTransfer?.setDragImage(e.currentTarget, e.offsetX, e.offsetY);
+  }
+
+  let timeout = $state(0);
+
+  function 마진탭드래그오버(e: DragEvent, 마진탭: Types.브랜드별마진그룹타입) {
+    if (!(드래그하고있는마진탭 && 마진탭.uuid != 드래그하고있는마진탭.uuid && 선택된브랜드)) return;
+    if (timeout) return;
+    const 기존마진탭인덱스 = 드래그하고있는마진탭.idx;
+    const 새마진탭인덱스 = 마진탭.idx;
+    const 대상 = 마진탭들.find(item => item.idx == 드래그하고있는마진탭?.idx);
+    if (대상) 대상.idx = 새마진탭인덱스;
+    드래그하고있는마진탭.idx = 새마진탭인덱스;
+    마진탭.idx = 기존마진탭인덱스;
+    마진탭들 = 마진탭들.sort((a, b) => a.idx - b.idx);
+    마진탭순서바꿈 = true;
+
+    timeout = setTimeout(() => {
+      clearTimeout(timeout);
+      timeout = 0;
+    }, 50);
+
+    e.stopPropagation();
+  }
+
+  async function 마진탭드래그끝() {
+    드래그하고있는마진탭 = undefined;
+
+    if (!마진탭순서바꿈) return;
+    try {
+      const swal = Swal;
+      swal.fire({
+        title: "적용 중...",
+        showConfirmButton: false,
+        allowEscapeKey: false,
+        allowOutsideClick: false,
+      });
+
+      const response = await fetch("https://b2b.soundcat.com/page/product_margin_group_update.php?action=order", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Use-Dev": useDev ? "true" : "false",
+        },
+        body: JSON.stringify(
+          마진탭들.map(item => ({
+            uuid: item.uuid,
+            brand: item.brand,
+            idx: item.idx,
+          })),
+        ),
+      });
+
+      if (!response.ok) throw new Error("서버 접속 실패");
+
+      const result = await response.json();
+      await 마진그룹가져오기();
+      swal.clickConfirm();
+
+      if (result.status != "success")
+        Swal.fire({
+          icon: "error",
+          title: "그룹 순서 변경에 실패했습니다.",
+        });
+    } catch (e) {
+      console.error((e as Error).message);
+    }
   }
 
   onMount(async () => {
@@ -395,11 +494,11 @@
     <li><button aria-label="마진 설정 보기" title="마진 설정 보기" onclick={() => (마진설정보기활성화 = true)}><i class="far fa-window-restore"></i></button></li>
     <div class="gap"></div>
     <li class={[(현재마진탭 == "default_margin" || 현재마진탭 == undefined) && "active"]}>
-      <a href="#default_margin" onclick={() => (현재마진탭 = "default_margin")}>기본마진</a>
+      <a href="#default_margin" onclick={() => (현재마진탭 = "default_margin")} draggable="false">기본마진</a>
     </li>
-    {#each 마진그룹[선택된브랜드]?.filter(x => x.uuid !== "default_margin") ?? [] as 마진탭 (마진탭.uuid)}
-      <li class={[현재마진탭 == 마진탭.uuid && "active"]}>
-        <a href="#{마진탭.uuid}" onclick={() => (현재마진탭 = 마진탭.uuid ?? "default_margin")}>
+    {#each 마진탭들 as 마진탭 (마진탭.uuid)}
+      <li class={[현재마진탭 == 마진탭.uuid && "active"]} ondragstart={e => 마진탭드래그(e, 마진탭)} ondrop={마진탭드래그끝} animate:flip={{ duration: 200 }} draggable="true">
+        <a href="#{마진탭.uuid}" onclick={() => (현재마진탭 = 마진탭.uuid ?? "default_margin")} ondragenter={e => 마진탭드래그오버(e, 마진탭)}>
           {마진탭.label}
           <button
             class="group-menu-btn"
@@ -436,7 +535,7 @@
         groupMenu.item = undefined;
       };
     }}>
-    <button onclick={() => 그룹명편집(groupMenu.item?.label, groupMenu.item?.uuid)}>마진 그룹명 변경</button>
+    <button onclick={() => 그룹명편집(groupMenu.item?.label, groupMenu.item?.uuid, groupMenu.item?.idx ?? -1)}>마진 그룹명 변경</button>
     <button onclick={() => 새마진그룹(groupMenu.item?.uuid)}>마진 설정값 복제</button>
     <button onclick={() => 그룹삭제(groupMenu.item?.label, groupMenu.item?.uuid)}>마진 그룹 삭제</button>
   </div>

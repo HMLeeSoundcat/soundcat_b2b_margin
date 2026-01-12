@@ -59,7 +59,8 @@ export interface 브랜드별마진그룹타입 {
   uuid: string | null;
   label: string;
   data: 확장된아이디목록[] | null;
-  brand?: string;
+  brand: string;
+  idx: number;
   active?: boolean;
   element?: HTMLElement | undefined;
   search: string | undefined
