@@ -474,6 +474,8 @@
     }
   }
 
+  function 도움말() {}
+
   onMount(async () => {
     await 마진그룹가져오기();
   });
@@ -491,7 +493,7 @@
   }} />
 {#if 선택된브랜드}
   <ul class="app-groups">
-    <li><button aria-label="마진 설정 보기" title="마진 설정 보기" onclick={() => (마진설정보기활성화 = true)}><i class="far fa-window-restore"></i></button></li>
+    <li class="dedicated"><button aria-label="마진 설정 보기" title="마진 설정 보기" onclick={() => (마진설정보기활성화 = true)}><i class="far fa-window-restore"></i></button></li>
     <div class="gap"></div>
     <li class={[(현재마진탭 == "default_margin" || 현재마진탭 == undefined) && "active"]}>
       <a href="#default_margin" onclick={() => (현재마진탭 = "default_margin")} draggable="false">기본마진</a>
@@ -515,11 +517,9 @@
         </a>
       </li>
     {/each}
-    <li>
-      <button onclick={() => 새마진그룹()}>+</button>
-    </li>
-    <li>
-      <button aria-label="도움말"><i class="fas fa-question-circle"></i></button>
+    <div class="gap"></div>
+    <li class="dedicated">
+      <button onclick={() => 새마진그룹()} title="새 마진그룹 추가" class="new_group_btn">추가</button>
     </li>
   </ul>
 {/if}

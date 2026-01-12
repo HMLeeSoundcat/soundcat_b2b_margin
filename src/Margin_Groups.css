@@ -18,17 +18,16 @@
   border: 1px solid #eee;
   border-right: none;
   border-bottom: none;
-  overflow: hidden;
   transition: 0.2s;
 }
-.app-groups li:nth-child(1) {
+.app-groups li.dedicated {
   border-radius: 8px 8px 0 0;
   border-right: 1px solid #eee;
 }
 .app-groups li:nth-of-type(2) {
   border-top-left-radius: 8px;
 }
-.app-groups li:nth-last-child(1) {
+.app-groups li:nth-last-of-type(2) {
   border-top-right-radius: 8px;
   border-right: 1px solid #eee;
 }
@@ -51,7 +50,7 @@
   position: relative;
 }
 
-.app-groups li > :is(a, button):hover {
+.app-groups li:has(a, button):hover {
   background: #f8f8f8;
 }
 
@@ -59,14 +58,14 @@
   border-radius: 8px 8px 0 0;
 }
 
-.app-groups li.active > :is(a, button) {
+.app-groups li.active:has(a, button) {
   background: #eee;
 }
 .app-groups li.active > :is(a, button) {
   padding: 0.7em 1em;
   font-weight: bold;
 }
-.app-groups li > :is(a, button):active {
+.app-groups li:has(a:active, button:active) {
   background: #e8e8e8;
 }
 
