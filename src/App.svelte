@@ -91,7 +91,7 @@
   let 마진그룹갱신 = $state(false);
 
   let 현재마진탭: string = $state("default_margin");
-  let 현재마진라벨: string | undefined = $derived(마진그룹선택된브랜드.find(x => x.uuid == 현재마진탭)?.label.replace("기본마진", ""));
+  let 현재마진라벨: string | undefined = $derived(마진그룹선택된브랜드.find(x => x.uuid == 현재마진탭)?.label?.replace("기본마진", "") ?? "");
 
   let 마진공급가자동계산 = $derived(선택된브랜드품목?.every(품목 => 품목.default_margin && typeof 품목.default_margin == "object" && 품목.default_margin.link_def && 품목.default_margin.link_disc));
 
@@ -672,7 +672,17 @@
   </button>
 {/snippet}
 
-<svelte:window onkeydown={테이블셀상하이동} onpointerup={포인터업} on:dragover={e => e.preventDefault()} on:drop={e => e.preventDefault()} />
+<svelte:window
+  onkeydown={테이블셀상하이동}
+  onpointerup={포인터업}
+  ondragover={e => e.preventDefault()}
+  ondrop={e => e.preventDefault()}
+  onbeforeunload={e => {
+    if (!내용변경여부) return;
+    e.preventDefault();
+    e.returnValue = "저장하지 않은 변경 사항이 있습니다. 정말로 페이지를 떠나시겠습니까?";
+    return "저장하지 않은 내용이 있습니다.";
+  }} />
 <div class={["app-section", 마진설정보기활성화 && "margin_popup"]} bind:this={앱요소}>
   <Sidebar {브랜드} bind:선택된브랜드 {마진그룹} {품목목록가져오기} />
   <div class="app-toolbar">

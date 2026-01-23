@@ -218,7 +218,7 @@
   }
 
   async function 그룹명편집(현재그룹명: string | undefined, uuid: string | null | undefined, idx: number) {
-    if (!(현재그룹명 && uuid)) return;
+    if (!uuid) return;
     groupMenu.active = false;
 
     swal = Swal;
@@ -276,7 +276,7 @@
   }
 
   async function 그룹삭제(현재그룹명: string | undefined, uuid: string | null | undefined) {
-    if (!(현재그룹명 && uuid)) return;
+    if (!uuid) return;
     groupMenu.active = false;
 
     swal = Swal;
