@@ -20,11 +20,12 @@
     현재마진탭: string;
     선택된브랜드품목: Types.개별품목타입[];
     변경된행: SvelteMap<Types.개별품목타입["no_id"], Types.개별품목타입>;
+    적용: () => Promise<void>;
   }
 
   const useDev = import.meta.env.MODE === "development";
 
-  let { 앱요소, 선택된브랜드, 아이디목록, 편집된그룹, 마진그룹 = $bindable(), 마진그룹선택된브랜드 = $bindable(), 마진그룹갱신 = $bindable(), 마진설정보기팝업 = $bindable(), 마진설정보기활성화 = $bindable(), 현재마진탭 = $bindable(), 선택된브랜드품목 = $bindable(), 변경된행 }: Props = $props();
+  let { 앱요소, 선택된브랜드, 아이디목록, 편집된그룹, 마진그룹 = $bindable(), 마진그룹선택된브랜드 = $bindable(), 마진그룹갱신 = $bindable(), 마진설정보기팝업 = $bindable(), 마진설정보기활성화 = $bindable(), 현재마진탭 = $bindable(), 선택된브랜드품목, 변경된행, 적용 }: Props = $props();
 
   let 기본마진그룹아이디목록: Types.확장된아이디목록[] = $state([]);
   let 미공급업체아이디목록: Types.확장된아이디목록[] = $state([]);
@@ -67,6 +68,8 @@
   $effect(() => {
     if (!선택된브랜드) return;
 
+    const 아이디목록 = Array.isArray(기본마진그룹아이디목록) ? 기본마진그룹아이디목록 : [];
+
     const 설정된아이디 = new Set(마진그룹[선택된브랜드]?.flatMap(y => y.data?.map(d => d.mb_id)) || []);
 
     마진그룹선택된브랜드 = 선택된브랜드
@@ -89,7 +92,7 @@
             uuid: null,
             brand: 선택된브랜드,
             label: "미분류된 업체",
-            data: 기본마진그룹아이디목록.filter(x => !설정된아이디.has(x.mb_id)),
+            data: 아이디목록.filter(x => !설정된아이디.has(x.mb_id)),
             element: undefined,
             search: undefined,
           },
@@ -166,7 +169,7 @@
         body: JSON.stringify({
           label: 팝업창내용.label,
           brand: 선택된브랜드,
-          idx: 마진그룹[선택된브랜드].length,
+          idx: 마진그룹[선택된브랜드]?.length,
           data: [],
         }),
       });
@@ -324,13 +327,7 @@
 
       swal.clickConfirm();
 
-      if (result.status == "success")
-        Swal.fire({
-          icon: "success",
-          title: "그룹이 삭제되었습니다.",
-          text: "창을 닫고 저장을 눌러 기존 그룹의 마진값을 삭제해주세요.",
-          confirmButtonText: "닫기",
-        });
+      await 적용();
     } catch (e) {
       console.error((e as Error).message);
     } finally {

@@ -9,7 +9,9 @@
   content: "";
   opacity: 0;
   color: transparent;
-  transition: color 0.2s, opacity 0.2s;
+  transition:
+    color 0.2s,
+    opacity 0.2s;
 }
 .app-section.submitting::after {
   content: "적용중입니다...";
@@ -31,7 +33,7 @@
 }
 
 :global(body > *:has(.app-section)) {
-  transition: .4s;
+  transition: 0.4s;
 }
 :global(body > *:has(.app-section.margin_popup)) {
   transform: scale(0.97);
@@ -143,69 +145,40 @@
   color: white;
 }
 .app-table-container {
-  overflow-x: auto;
-  height: calc(100vh - calc(216px + 5em));
-  overflow-y: auto;
   position: relative;
-}
-.app-table-container::before {
-  content: "";
-  position: sticky;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  background-image: var(--x-grad), var(--y-grad);
-  pointer-events: none;
-  z-index: 9;
-  transition: 0.2s;
-}
-:global([data-x="both"]) {
-  --x-grad: var(--x-grad-start), var(--x-grad-end);
-}
-:global([data-x="left"]) {
-  --x-grad: var(--x-grad-start);
-}
-:global([data-x="right"]) {
-  --x-grad: var(--x-grad-end);
-}
-:global([data-y="both"]) {
-  --y-grad: var(--y-grad-start), var(--y-grad-end);
-}
-:global([data-y="top"]) {
-  --y-grad: var(--y-grad-start);
-}
-:global([data-y="bottom"]) {
-  --y-grad: var(--y-grad-end);
-}
-:global([data-x="no"]) {
-  --x-grad: linear-gradient(90deg, transparent, transparent);
-}
-:global([data-y="no"]) {
-  --y-grad: linear-gradient(180deg, transparent, transparent);
-}
-.app-section {
-  --x-grad-start: linear-gradient(90deg, white 0%, transparent 5%);
-  --x-grad-end: linear-gradient(90deg, transparent 95%, white 100%);
-  --y-grad-start: linear-gradient(180deg, transparent, transparent 5%);
-  --y-grad-end: linear-gradient(180deg, transparent 95%, white 100%);
+  overflow-y: scroll;
 }
 .app-table {
   width: 100%;
   min-width: 1200px;
   border-collapse: collapse;
-  position: absolute;
-  top: 0;
-  left: 0;
 }
 .app-table thead {
   background: #eee;
   box-shadow: 0 2px 4px #0002;
-  position: sticky;
-  top: 0;
-  z-index: 9;
   text-align: center;
+}
+.app-table-container.scrolling {
+  padding-top: 5em;
+}
+.app-table-container.scrolling thead {
+  position: fixed;
+  top: var(--top, 0px);
+  left: var(--left, 0px);
+  z-index: 10;
+}
+.app-table-container thead th {
+  height: 5em;
+}
+.app-table-container.scrolling thead th {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.app-table-container.scrolling thead tr {
+  display: flex;
+  align-items: center;
+  width: var(--table-width, 100%);
 }
 .app-table tr {
   border-bottom: 1px solid #ddd;
@@ -289,7 +262,9 @@
   outline: none;
   border-bottom: 2px solid #eee;
   background-color: transparent;
-  transition: border 0.2s, background-color 0.2s;
+  transition:
+    border 0.2s,
+    background-color 0.2s;
   text-align: center;
 }
 .app-table td input[type="text"]:hover {

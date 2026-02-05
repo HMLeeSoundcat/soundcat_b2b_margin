@@ -1,5 +1,3 @@
-import type { SvelteMap } from "svelte/reactivity";
-
 export interface 개별품목타입 {
   no_id: number;
   brand: string;

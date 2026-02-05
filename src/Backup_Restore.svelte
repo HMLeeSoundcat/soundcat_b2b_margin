@@ -220,39 +220,23 @@
       title: "백업은 제품 목록 관리 페이지에서만 가능합니다.",
       text: "마진 관리 페이지에서 백업을 진행할 시 일부 데이터가 누락될 가능성이 있으므로, 제품 목록 관리 페이지에서만 백업이 가능합니다. 확인을 누르시면 제품 목록 관리 페이지로 이동합니다.",
       confirmButtonText: "확인",
+      cancelButtonText: "닫기",
+      showCancelButton: true,
     });
     if (팝업창.isConfirmed) location.href = "https://b2b.soundcat.com/page/products_new.php";
   }
 </script>
 
-<button
-  onclick={복원동작}
-  class="button restore">복원 <i class="fas fa-upload"></i></button>
-<button
-  onclick={백업동작}
-  class="button backup">백업 <i class="fas fa-download"></i></button>
+<button onclick={복원동작} class="button restore">복원 <i class="fas fa-upload"></i></button>
+<button onclick={백업동작} class="button backup">백업 <i class="fas fa-download"></i></button>
 
 {#if 팝업창열림여부 == 1}
   <Portal target=".backupAndRestorePopup">
     <div>
       <h3 style="margin-bottom: 1em;">백업할 위치를 선택해주세요.</h3>
       <div>
-        <label
-          for="backupToLocal"
-          class="app_radio">
-          <i></i>내 컴퓨터<input
-            id="backupToLocal"
-            type="radio"
-            bind:group={백업위치}
-            value={1} /></label>
-        <label
-          for="backupToServer"
-          class="app_radio">
-          <i></i>서버<input
-            id="backupToServer"
-            type="radio"
-            bind:group={백업위치}
-            value={2} /></label>
+        <label for="backupToLocal" class="app_radio"> <i></i>내 컴퓨터<input id="backupToLocal" type="radio" bind:group={백업위치} value={1} /></label>
+        <label for="backupToServer" class="app_radio"> <i></i>서버<input id="backupToServer" type="radio" bind:group={백업위치} value={2} /></label>
       </div>
       {#if 백업위치 == 2}
         <div>
@@ -272,22 +256,8 @@
     <div>
       <h3 style="margin-bottom: 1em;">어디로부터 데이터를 복원할까요?</h3>
       <div>
-        <label
-          for="backupToLocal"
-          class="app_radio">
-          <i></i>내 컴퓨터<input
-            id="backupToLocal"
-            type="radio"
-            bind:group={백업위치}
-            value={1} /></label>
-        <label
-          for="backupToServer"
-          class="app_radio">
-          <i></i>서버<input
-            id="backupToServer"
-            type="radio"
-            bind:group={백업위치}
-            value={2} /></label>
+        <label for="backupToLocal" class="app_radio"> <i></i>내 컴퓨터<input id="backupToLocal" type="radio" bind:group={백업위치} value={1} /></label>
+        <label for="backupToServer" class="app_radio"> <i></i>서버<input id="backupToServer" type="radio" bind:group={백업위치} value={2} /></label>
       </div>
       {#if 백업위치 == 1}
         <hr />
@@ -308,11 +278,7 @@
             <div>{업로드파일[0].name}</div>
           {/if}
         </div>
-        <input
-          type="file"
-          class="file"
-          bind:this={파일선택기}
-          bind:files={업로드파일} />
+        <input type="file" class="file" bind:this={파일선택기} bind:files={업로드파일} />
       {:else if 백업위치 == 2}
         <hr />
         {#await 복원요청작업()}
@@ -320,10 +286,7 @@
         {:then 결과}
           <div>
             <div>복원할 자료를 선택해주세요.</div>
-            <select
-              name="backupData"
-              id="backupData"
-              bind:value={선택된백업항목}>
+            <select name="backupData" id="backupData" bind:value={선택된백업항목}>
               {#each 결과.sort((a: string[], b: string[]) => parseInt(b[0]) - parseInt(a[0])) as 목록}
                 <option value={목록[0]}>{목록[1]} {목록[2] && `(${목록[2]})`}</option>
               {/each}
@@ -342,22 +305,13 @@
       {#if 업로드파일 || 선택된백업항목}
         <div style="margin-top: 1em;">
           {#if 백업위치 == 2}
-            <button
-              type="button"
-              class="button red"
-              onclick={() => 팝업창?.clickDeny()}>삭제</button>
+            <button type="button" class="button red" onclick={() => 팝업창?.clickDeny()}>삭제</button>
           {/if}
-          <button
-            type="button"
-            class="button"
-            onclick={() => 팝업창?.clickConfirm()}>다음</button>
+          <button type="button" class="button" onclick={() => 팝업창?.clickConfirm()}>다음</button>
         </div>
       {/if}
       <div style="margin-top: 1em;">
-        <button
-          type="button"
-          class="button grey"
-          onclick={() => 팝업창?.clickCancel()}>취소</button>
+        <button type="button" class="button grey" onclick={() => 팝업창?.clickCancel()}>취소</button>
       </div>
     </div>
   </Portal>

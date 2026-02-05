@@ -86,7 +86,7 @@
 
   let 마진설정보기활성화 = $state(false);
   let 마진설정보기팝업: HTMLElement | undefined = $state();
-  let 마진그룹: Types.마진그룹타입 = $derived({});
+  let 마진그룹: Types.마진그룹타입 = $state({});
   let 마진그룹선택된브랜드: Types.브랜드별마진그룹타입[] = $state([]);
   let 마진그룹갱신 = $state(false);
 
@@ -143,6 +143,7 @@
   let 품목테이블바디: HTMLElement | undefined = $state();
 
   let 테이블컨테이너: HTMLElement | undefined = $state();
+  let 테이블헤더고정여부: boolean = $state(false);
 
   let 앱요소: HTMLElement | undefined = $state();
 
@@ -341,9 +342,11 @@
         if (현재마진탭) {
           품목.default_margin.per_group[현재마진탭][유형] = undefined;
           if (품목.default_margin[링크타겟] && 링크값) 품목.default_margin.per_group[현재마진탭][링크값] = undefined;
+          if (링크값가격계산여부 && 링크값 && (유형 == "default_margin" || 유형 == "discount_margin")) 품목.default_margin.per_group[현재마진탭][링크값] = 링크값계산(링크값가격계산여부, 품목.price, 품목.default_margin[유형], 품목.default_margin[유형]);
         } else {
           품목.default_margin[유형] = undefined;
           if (품목.default_margin[링크타겟] && 링크값) 품목.default_margin[링크값] = undefined;
+          if (링크값가격계산여부 && 링크값 && (유형 == "default_margin" || 유형 == "discount_margin")) 품목.default_margin[링크값] = 링크값계산(링크값가격계산여부, 품목.price, undefined, undefined);
         }
         continue;
       }
@@ -435,6 +438,16 @@
           showConfirmButton: false,
           allowEscapeKey: false,
           allowOutsideClick: false,
+        });
+        const 마진그룹UUID = 마진그룹선택된브랜드.map(y => y.uuid);
+        [...변경된행.values()].forEach(x => {
+          if (x.default_margin.per_group) {
+            for (const uuid of Object.keys(x.default_margin.per_group)) {
+              if (!마진그룹UUID.includes(uuid)) {
+                delete x.default_margin.per_group[uuid];
+              }
+            }
+          }
         });
         const 요청 = await fetch("https://b2b.soundcat.com/page/margin_setup_update.php", {
           method: "POST",
@@ -539,35 +552,20 @@
     if (마진설정보기활성화 && e.target instanceof HTMLElement && 마진설정보기팝업 && !마진설정보기팝업.contains(e.target)) 마진설정보기활성화 = false;
   }
 
-  /** 테이블에서 스크롤 시 모서리에 그라데이션을 적용한다. */
+  let tableThrottle = false;
+
   function 테이블스크롤(e: UIEvent) {
     if (!테이블컨테이너) return;
-
-    const tableFullWidth = 테이블컨테이너.scrollWidth;
-    const tableClientWidth = 테이블컨테이너.clientWidth;
-    const tableFullHeight = 테이블컨테이너.scrollHeight;
-    const tableClientHeight = 테이블컨테이너.clientHeight;
-    const xScrollPos = 테이블컨테이너.scrollLeft;
-    const yScrollPos = 테이블컨테이너.scrollTop;
-
-    if (tableFullWidth != tableClientWidth) {
-      if (xScrollPos == 0) {
-        테이블컨테이너.setAttribute("data-x", "right");
-      } else if (xScrollPos + tableClientWidth == tableFullWidth) {
-        테이블컨테이너.setAttribute("data-x", "left");
-      } else {
-        테이블컨테이너.setAttribute("data-x", "both");
-      }
+    const rect = 테이블컨테이너.getBoundingClientRect();
+    if (rect.top <= 0) {
+      테이블헤더고정여부 = true;
+    } else {
+      테이블헤더고정여부 = false;
     }
-
-    if (tableFullHeight != tableClientHeight) {
-      if (yScrollPos == 0) {
-        테이블컨테이너.setAttribute("data-y", "bottom");
-      } else if (yScrollPos + tableClientHeight == tableFullHeight) {
-        테이블컨테이너.setAttribute("data-y", "top");
-      } else {
-        테이블컨테이너.setAttribute("data-y", "both");
-      }
+    테이블컨테이너.style.setProperty("--left", `${rect.left - 테이블컨테이너.scrollLeft}px`);
+    const table = 테이블컨테이너.querySelector("table");
+    if (table) {
+      테이블컨테이너.style.setProperty("--table-width", `${table.offsetWidth}px`);
     }
   }
 
@@ -601,7 +599,15 @@
       선택된브랜드품목.forEach(element => {
         if (!element.default_margin.per_group) {
           element.default_margin = {
-            ...element.default_margin,
+            brand_disc_amount: element.default_margin.brand_disc_amount,
+            link_def: element.default_margin.link_def,
+            link_disc: element.default_margin.link_disc,
+            default_margin: undefined,
+            default_prov: undefined,
+            discount_margin: undefined,
+            discount_price: undefined,
+            discount_qty: undefined,
+            per_user: element.default_margin.per_user,
             per_group: {
               default_margin: {
                 default_margin: element.default_margin.default_margin,
@@ -658,6 +664,7 @@
     <input
       type="text"
       onchange={() => 행업데이트(품목, target)}
+      onkeydown={e => e.key == "Enter" && 행업데이트(품목, target)}
       bind:value={
         () => 마진값겟터({ 품목, 유형: target }),
         (v: string | number | undefined) => {
@@ -682,6 +689,22 @@
     e.preventDefault();
     e.returnValue = "저장하지 않은 변경 사항이 있습니다. 정말로 페이지를 떠나시겠습니까?";
     return "저장하지 않은 내용이 있습니다.";
+  }}
+  onscroll={e => {
+    if (tableThrottle) return;
+    tableThrottle = true;
+    requestAnimationFrame(() => {
+      테이블스크롤(e);
+      tableThrottle = false;
+    });
+  }}
+  onresize={e => {
+    if (tableThrottle) return;
+    tableThrottle = true;
+    requestAnimationFrame(() => {
+      테이블스크롤(e);
+      tableThrottle = false;
+    });
   }} />
 <div class={["app-section", 마진설정보기활성화 && "margin_popup"]} bind:this={앱요소}>
   <Sidebar {브랜드} bind:선택된브랜드 {마진그룹} {품목목록가져오기} />
@@ -758,9 +781,19 @@
       </div>
     </div>
   {/if}
-  <MarginGroups {선택된브랜드} bind:마진그룹 bind:마진그룹선택된브랜드 bind:마진그룹갱신 bind:마진설정보기활성화 bind:마진설정보기팝업 bind:현재마진탭 {앱요소} {아이디목록} bind:선택된브랜드품목 {편집된그룹} {변경된행} />
+  <MarginGroups {선택된브랜드} bind:마진그룹 bind:마진그룹선택된브랜드 bind:마진그룹갱신 bind:마진설정보기활성화 bind:마진설정보기팝업 bind:현재마진탭 {앱요소} {아이디목록} {선택된브랜드품목} {편집된그룹} {변경된행} {적용} />
   {#if 선택된브랜드 && 선택된브랜드품목}
-    <div class={["app-table-container"]} data-x="no" data-y="bottom" bind:this={테이블컨테이너} onwheel={테이블스크롤}>
+    <div
+      class={["app-table-container", 테이블헤더고정여부 && "scrolling"]}
+      bind:this={테이블컨테이너}
+      onscroll={e => {
+        if (tableThrottle) return;
+        tableThrottle = true;
+        requestAnimationFrame(() => {
+          테이블스크롤(e);
+          tableThrottle = false;
+        });
+      }}>
       <table class="app-table">
         <colgroup>
           {#each Object.keys(품목테이블컬럼속성) as 컬럼명}
@@ -773,7 +806,7 @@
           <tr>
             {#each Object.keys(품목테이블컬럼속성) as 컬럼명}
               {#if 품목테이블컬럼속성[컬럼명 as keyof typeof 품목테이블컬럼속성].display}
-                <th>
+                <th style="width: {품목테이블컬럼속성[컬럼명 as keyof typeof 품목테이블컬럼속성].width}">
                   <div>
                     <span>
                       {품목테이블컬럼속성[컬럼명 as keyof typeof 품목테이블컬럼속성].label}
