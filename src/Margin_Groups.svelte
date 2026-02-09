@@ -114,7 +114,6 @@
   $effect(() => {
     if (선택된브랜드 && 마진그룹선택된브랜드.length) 마진탭들 = 마진그룹[선택된브랜드]?.filter(x => x.uuid !== "default_margin").sort((a, b) => a.idx - b.idx) ?? [];
   });
-
   async function 마진그룹가져오기() {
     마진그룹 = {};
     try {
@@ -355,43 +354,51 @@
     }
     document.body.appendChild(element);
     e.dataTransfer?.setDragImage(element, 0, 0);
-    setTimeout(() => element.remove(), 0);
+    let timeout = setTimeout(() => element.remove(), 0);
+    return () => {
+      clearTimeout(timeout);
+      element.remove();
+    };
   }
 
   let dragBoxIndex = $state(Number.NEGATIVE_INFINITY);
 
   function 드래그끝(e: DragEvent, 마진탭: Types.브랜드별마진그룹타입) {
-    const data = JSON.parse(e.dataTransfer?.getData("text/plain") ?? "[]");
+    try {
+      const data = JSON.parse(e.dataTransfer?.getData("text/plain") ?? "[]");
 
-    if (!Array.isArray(마진탭.data)) 마진탭.data = [];
+      if (!Array.isArray(마진탭.data)) 마진탭.data = [];
 
-    if (data.uuid === 마진탭.uuid) return;
-    const ids = 마진그룹선택된브랜드.find(x => x.uuid === data.uuid)?.data;
+      if (data.uuid === 마진탭.uuid) return;
+      const ids = 마진그룹선택된브랜드.find(x => x.uuid === data.uuid)?.data;
 
-    if (!Array.isArray(data.data)) return;
+      if (!Array.isArray(data.data)) return;
 
-    for (const element of 마진탭.data) {
-      element.selected = false;
-    }
+      for (const element of 마진탭.data) {
+        element.selected = false;
+      }
 
-    data.data.forEach((item: Types.확장된아이디목록) => {
-      if (!(Array.isArray(ids) && Array.isArray(마진탭.data))) return;
-      const index = ids.findIndex(x => x.mb_id == item.mb_id);
-      if (index < 0) return;
-      ids.splice(index, 1);
-    });
-
-    마진탭.data.splice(dragBoxIndex, 0, ...data.data);
-
-    if (마진탭.uuid && 선택된브랜드)
-      편집된그룹.set(마진탭.uuid, {
-        ...마진탭,
-        brand: 선택된브랜드,
-        element: undefined,
+      data.data.forEach((item: Types.확장된아이디목록) => {
+        if (!(Array.isArray(ids) && Array.isArray(마진탭.data))) return;
+        const index = ids.findIndex(x => x.mb_id == item.mb_id);
+        if (index < 0) return;
+        ids.splice(index, 1);
       });
 
-    const 기존마진그룹목록 = 마진그룹선택된브랜드.find(x => x.uuid == data.uuid);
-    if (기존마진그룹목록 && data.uuid !== null) 편집된그룹.set(data.uuid, 기존마진그룹목록);
+      마진탭.data.splice(dragBoxIndex, 0, ...data.data);
+
+      if (마진탭.uuid && 선택된브랜드)
+        편집된그룹.set(마진탭.uuid, {
+          ...마진탭,
+          brand: 선택된브랜드,
+          element: undefined,
+        });
+
+      const 기존마진그룹목록 = 마진그룹선택된브랜드.find(x => x.uuid == data.uuid);
+      if (기존마진그룹목록 && data.uuid !== null) 편집된그룹.set(data.uuid, 기존마진그룹목록);
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   function 아이디검색필터(item: Types.아이디목록타입, 마진탭: Types.브랜드별마진그룹타입) {
@@ -632,6 +639,9 @@
                         아이디.selected = true;
 
                         if (modifier != "shift") lastSelected = 인덱스;
+                      }}
+                      {@attach () => {
+                        아이디.selected = false;
                       }}>
                       {아이디.mb_nick}
                     </div>

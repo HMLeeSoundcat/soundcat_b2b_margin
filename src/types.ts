@@ -17,12 +17,12 @@ export interface 품목목록타입 {
 }
 
 export interface 마진설정값타입 {
-  default_margin: number | string | undefined;
-  default_prov: number | string | undefined;
-  discount_margin: number | string | undefined;
-  discount_price: number | string | undefined;
-  discount_qty: number | string | undefined;
-  brand_disc_amount?: number | string | undefined;
+  default_margin: number | undefined;
+  default_prov: number | undefined;
+  discount_margin: number | undefined;
+  discount_price: number | undefined;
+  discount_qty: number | undefined;
+  brand_disc_amount?: number | undefined;
 }
 
 export interface 마진타입 extends 마진설정값타입 {
