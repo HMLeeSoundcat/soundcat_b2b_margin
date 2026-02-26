@@ -924,7 +924,7 @@
                     <span>{Intl.NumberFormat("ko-KR").format(품목.price)}</span>
                   </div></td>
                 {#if typeof 품목.default_margin == "object"}
-                  {#if 품목.default_margin.per_group[현재마진탭]?.discount_qty == 1 || 품목.default_margin.per_group["default_margin"]?.discount_qty == 1}
+                  {#if 품목.default_margin.per_group?.[현재마진탭]?.discount_qty == 1 || 품목.default_margin.per_group?.["default_margin"]?.discount_qty == 1}
                     <td colspan="2">
                       <div class="no_default_margin">할인 수량: 1이므로 기본마진을 설정할 수 없습니다.</div>
                     </td>
